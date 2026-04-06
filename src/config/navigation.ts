@@ -1,12 +1,19 @@
 import {
   LucideIcon,
+  ClipboardCheck,
+  House,
   HandCoins,
   LayoutGrid,
+  LocateFixed,
   Package,
+  Receipt,
+  ShoppingBasket,
   ShoppingCart,
+  Store,
   Truck,
   Users,
 } from "lucide-react";
+import { UserRole } from "@/types/auth";
 
 export interface NavItem {
   label: string;
@@ -14,11 +21,89 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-export const SIDEBAR_NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutGrid },
-  { label: "POS", href: "/pos", icon: HandCoins },
-  { label: "Products", href: "/products", icon: Package },
-  { label: "Orders", href: "/orders", icon: ShoppingCart },
-  { label: "Deliveries", href: "/deliveries", icon: Truck },
-  { label: "Users", href: "/users", icon: Users },
+export type RoleModuleConfig = {
+  title: string;
+  role: Exclude<UserRole, "ADMIN">;
+  routeBase: string;
+  modules: NavItem[];
+};
+
+export const ROLE_MODULES: RoleModuleConfig[] = [
+  {
+    title: "Buyer Modules",
+    role: "BUYER",
+    routeBase: "/buyer",
+    modules: [
+      { label: "Home", href: "/buyer/home", icon: House },
+      { label: "Product List", href: "/buyer/products", icon: Package },
+      { label: "Cart", href: "/buyer/cart", icon: ShoppingBasket },
+      { label: "Checkout (COD)", href: "/buyer/checkout", icon: Receipt },
+      { label: "Order Tracking", href: "/buyer/tracking", icon: Truck },
+    ],
+  },
+  {
+    title: "Seller Modules",
+    role: "SELLER",
+    routeBase: "/seller",
+    modules: [
+      { label: "Dashboard", href: "/seller/dashboard", icon: LayoutGrid },
+      {
+        label: "Product Management",
+        href: "/seller/products",
+        icon: Package,
+      },
+      { label: "POS", href: "/seller/pos", icon: HandCoins },
+      { label: "Order Management", href: "/seller/orders", icon: ShoppingCart },
+      {
+        label: "Inventory Sync",
+        href: "/seller/inventory",
+        icon: ClipboardCheck,
+      },
+    ],
+  },
+  {
+    title: "Rider Modules",
+    role: "RIDER",
+    routeBase: "/rider",
+    modules: [
+      {
+        label: "Accept Order",
+        href: "/rider/accept-order",
+        icon: ShoppingCart,
+      },
+      {
+        label: "Update Status",
+        href: "/rider/update-status",
+        icon: ClipboardCheck,
+      },
+      {
+        label: "Send Location",
+        href: "/rider/send-location",
+        icon: LocateFixed,
+      },
+      { label: "Mark Delivered", href: "/rider/mark-delivered", icon: Truck },
+    ],
+  },
 ];
+
+export const DEFAULT_NAV_ITEMS: NavItem[] = [
+  { label: "Role Hub", href: "/", icon: LayoutGrid },
+  { label: "Buyer", href: "/buyer", icon: Users },
+  { label: "Seller", href: "/seller", icon: Store },
+  { label: "Rider", href: "/rider", icon: Truck },
+];
+
+const navByRole: Record<Exclude<UserRole, "ADMIN">, NavItem[]> = {
+  BUYER: ROLE_MODULES.find((config) => config.role === "BUYER")?.modules || [],
+  SELLER:
+    ROLE_MODULES.find((config) => config.role === "SELLER")?.modules || [],
+  RIDER: ROLE_MODULES.find((config) => config.role === "RIDER")?.modules || [],
+};
+
+export const getNavItemsByRole = (role?: UserRole | null): NavItem[] => {
+  if (!role || role === "ADMIN") {
+    return DEFAULT_NAV_ITEMS;
+  }
+
+  return navByRole[role] || DEFAULT_NAV_ITEMS;
+};

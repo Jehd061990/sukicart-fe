@@ -1,8 +1,18 @@
+"use client";
+
 import { PropsWithChildren } from "react";
+import { usePathname } from "next/navigation";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 
 export function AppShell({ children }: PropsWithChildren) {
+  const pathname = usePathname();
+  const isMarketingRoute = pathname === "/" || pathname.startsWith("/register");
+
+  if (isMarketingRoute) {
+    return <main className="min-h-screen">{children}</main>;
+  }
+
   return (
     <div className="flex min-h-screen bg-muted/30">
       <AppSidebar />

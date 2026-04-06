@@ -1,7 +1,13 @@
+"use client";
+
 import Link from "next/link";
-import { SIDEBAR_NAV_ITEMS } from "@/config/navigation";
+import { getNavItemsByRole } from "@/config/navigation";
+import { useAuthStore } from "@/store/auth.store";
 
 export function AppSidebar() {
+  const role = useAuthStore((state) => state.user?.role);
+  const navItems = getNavItemsByRole(role);
+
   return (
     <aside className="hidden h-screen w-64 shrink-0 border-r bg-card p-4 md:block">
       <div className="mb-8 px-2">
@@ -12,7 +18,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="space-y-1">
-        {SIDEBAR_NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
 
           return (
