@@ -9,9 +9,7 @@ import {
   Receipt,
   ShoppingBasket,
   ShoppingCart,
-  Store,
   Truck,
-  Users,
 } from "lucide-react";
 import { UserRole } from "@/types/auth";
 
@@ -86,13 +84,6 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
   },
 ];
 
-export const DEFAULT_NAV_ITEMS: NavItem[] = [
-  { label: "Role Hub", href: "/", icon: LayoutGrid },
-  { label: "Buyer", href: "/buyer", icon: Users },
-  { label: "Seller", href: "/seller", icon: Store },
-  { label: "Rider", href: "/rider", icon: Truck },
-];
-
 const navByRole: Record<Exclude<UserRole, "ADMIN">, NavItem[]> = {
   BUYER: ROLE_MODULES.find((config) => config.role === "BUYER")?.modules || [],
   SELLER:
@@ -102,8 +93,8 @@ const navByRole: Record<Exclude<UserRole, "ADMIN">, NavItem[]> = {
 
 export const getNavItemsByRole = (role?: UserRole | null): NavItem[] => {
   if (!role || role === "ADMIN") {
-    return DEFAULT_NAV_ITEMS;
+    return [];
   }
 
-  return navByRole[role] || DEFAULT_NAV_ITEMS;
+  return navByRole[role] || [];
 };

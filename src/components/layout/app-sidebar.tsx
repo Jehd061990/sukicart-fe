@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { getNavItemsByRole } from "@/config/navigation";
+import { usePathname } from "next/navigation";
+import { getNavItemsByRole, ROLE_MODULES } from "@/config/navigation";
 import { useAuthStore } from "@/store/auth.store";
 
 export function AppSidebar() {
+  const pathname = usePathname();
   const role = useAuthStore((state) => state.user?.role);
-  const navItems = getNavItemsByRole(role);
+
+  const inferredRole = ROLE_MODULES.find((moduleConfig) =>
+    pathname.startsWith(moduleConfig.routeBase),
+  )?.role;
+
+  const navItems = getNavItemsByRole(role ?? inferredRole ?? null);
 
   return (
     <aside className="hidden h-screen w-64 shrink-0 border-r bg-card p-4 md:block">

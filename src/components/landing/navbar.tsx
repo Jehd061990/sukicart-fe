@@ -13,6 +13,12 @@ export function Navbar() {
 
         <nav className="flex items-center gap-2 sm:gap-3">
           <Link
+            href="/login"
+            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Login
+          </Link>
+          <Link
             href="/register/buyer"
             className="rounded-full border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
           >

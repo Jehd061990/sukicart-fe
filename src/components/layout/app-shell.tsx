@@ -7,7 +7,10 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 
 export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
-  const isMarketingRoute = pathname === "/" || pathname.startsWith("/register");
+  const isMarketingRoute =
+    pathname === "/" ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/login");
 
   if (isMarketingRoute) {
     return <main className="min-h-screen">{children}</main>;
