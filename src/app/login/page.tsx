@@ -24,32 +24,35 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-type LoginRole = Extract<UserRole, "SELLER" | "BUYER" | "RIDER">;
+type LoginRole = Extract<UserRole, "ADMIN" | "SELLER" | "BUYER" | "RIDER">;
 
 const roleLabels: Record<LoginRole, string> = {
+  ADMIN: "Admin",
   BUYER: "Buyer",
   SELLER: "Seller",
   RIDER: "Rider",
 };
 
 const roleDescriptions: Record<LoginRole, string> = {
+  ADMIN: "Manage platform users, orders, and marketplace operations.",
   BUYER: "Browse products, manage cart, and track deliveries.",
   SELLER: "Manage your products, orders, POS, and inventory.",
   RIDER: "View assigned deliveries and update delivery status.",
 };
 
 const roleRedirects: Record<LoginRole, string> = {
+  ADMIN: "/admin/dashboard",
   BUYER: "/buyer/home",
   SELLER: "/seller/dashboard",
   RIDER: "/rider",
 };
 
-const roles: LoginRole[] = ["BUYER", "SELLER", "RIDER"];
+const roles: LoginRole[] = ["ADMIN", "BUYER", "SELLER", "RIDER"];
 
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const [selectedRole, setSelectedRole] = useState<LoginRole>("BUYER");
+  const [selectedRole, setSelectedRole] = useState<LoginRole>("ADMIN");
 
   const {
     register,
@@ -69,6 +72,10 @@ export default function LoginPage() {
       return "Use the rider account credentials provided by your dispatch/admin.";
     }
 
+    if (selectedRole === "ADMIN") {
+      return "Use your authorized admin credentials to manage platform operations.";
+    }
+
     return `Use your registered ${roleLabels[selectedRole].toLowerCase()} account credentials.`;
   }, [selectedRole]);
 
@@ -84,7 +91,7 @@ export default function LoginPage() {
         return;
       }
 
-      setAuth(response.token, response.user);
+      setAuth(response.accessToken, response.refreshToken, response.user);
       toast.success(`${roleLabels[returnedRole]} login successful`);
       router.push(roleRedirects[returnedRole]);
     } catch (error: unknown) {
@@ -119,7 +126,7 @@ export default function LoginPage() {
             Choose your role and sign in using your existing account.
           </p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {roles.map((role) => {
               const isSelected = selectedRole === role;
 
@@ -207,6 +214,14 @@ export default function LoginPage() {
           </h2>
 
           <div className="mt-5 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-sm font-bold text-slate-950">Admin</p>
+              <p className="mt-1 text-sm text-slate-900/85">
+                For platform administrators managing users, riders, sellers, and
+                orders.
+              </p>
+            </div>
+
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
               <p className="text-sm font-bold text-emerald-950">Buyer</p>
               <p className="mt-1 text-sm text-emerald-900/85">

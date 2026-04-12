@@ -5,11 +5,14 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  status?: "active" | "inactive" | "pending";
 }
 
 export interface AuthResponse {
   message: string;
-  token: string;
+  accessToken: string;
+  refreshToken: string;
+  token?: string;
   user: AuthUser;
 }
 

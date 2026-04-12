@@ -1,4 +1,5 @@
 import {
+  ShieldCheck,
   LucideIcon,
   ClipboardCheck,
   House,
@@ -21,7 +22,7 @@ export interface NavItem {
 
 export type RoleModuleConfig = {
   title: string;
-  role: Exclude<UserRole, "ADMIN">;
+  role: UserRole;
   routeBase: string;
   modules: NavItem[];
 };
@@ -60,6 +61,34 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     ],
   },
   {
+    title: "Admin Modules",
+    role: "ADMIN",
+    routeBase: "/admin",
+    modules: [
+      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid },
+      {
+        label: "Seller Management",
+        href: "/admin/dashboard#sellers",
+        icon: ClipboardCheck,
+      },
+      {
+        label: "Rider Management",
+        href: "/admin/dashboard#riders",
+        icon: Truck,
+      },
+      {
+        label: "Buyer Management",
+        href: "/admin/dashboard#buyers",
+        icon: ShieldCheck,
+      },
+      {
+        label: "Order Management",
+        href: "/admin/dashboard#orders",
+        icon: ShoppingCart,
+      },
+    ],
+  },
+  {
     title: "Rider Modules",
     role: "RIDER",
     routeBase: "/rider",
@@ -84,7 +113,8 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
   },
 ];
 
-const navByRole: Record<Exclude<UserRole, "ADMIN">, NavItem[]> = {
+const navByRole: Record<UserRole, NavItem[]> = {
+  ADMIN: ROLE_MODULES.find((config) => config.role === "ADMIN")?.modules || [],
   BUYER: ROLE_MODULES.find((config) => config.role === "BUYER")?.modules || [],
   SELLER:
     ROLE_MODULES.find((config) => config.role === "SELLER")?.modules || [],
@@ -92,7 +122,7 @@ const navByRole: Record<Exclude<UserRole, "ADMIN">, NavItem[]> = {
 };
 
 export const getNavItemsByRole = (role?: UserRole | null): NavItem[] => {
-  if (!role || role === "ADMIN") {
+  if (!role) {
     return [];
   }
 

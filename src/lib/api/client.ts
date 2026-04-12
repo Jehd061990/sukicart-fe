@@ -11,8 +11,18 @@ export const apiClient = axios.create({
   },
 });
 
+const refreshClient = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+let refreshPromise: Promise<void> | null = null;
+
 apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
+  const token =
+    useAuthStore.getState().accessToken || useAuthStore.getState().token;
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -23,11 +33,58 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error?.response?.status === 401) {
-      useAuthStore.getState().clearAuth();
+  async (error) => {
+    const originalRequest = error?.config as
+      | (typeof error.config & { _retry?: boolean })
+      | undefined;
+    const status = error?.response?.status;
+
+    if (!originalRequest || status !== 401) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    const requestUrl = String(originalRequest.url || "");
+    const isAuthRoute =
+      requestUrl.includes("/auth/login") ||
+      requestUrl.includes("/auth/register") ||
+      requestUrl.includes("/auth/refresh") ||
+      requestUrl.includes("/auth/logout");
+
+    if (isAuthRoute || originalRequest._retry) {
+      useAuthStore.getState().clearAuth();
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        const { refreshToken } = useAuthStore.getState();
+        if (!refreshToken) {
+          throw new Error("Missing refresh token");
+        }
+
+        const { data } = await refreshClient.post("/auth/refresh", {
+          refreshToken,
+        });
+
+        useAuthStore
+          .getState()
+          .setAuth(data.accessToken, data.refreshToken, data.user);
+      })().finally(() => {
+        refreshPromise = null;
+      });
+    }
+
+    try {
+      await refreshPromise;
+      const nextToken = useAuthStore.getState().accessToken;
+      originalRequest.headers = originalRequest.headers || {};
+      originalRequest.headers.Authorization = `Bearer ${nextToken}`;
+      return apiClient(originalRequest);
+    } catch (refreshError) {
+      useAuthStore.getState().clearAuth();
+      return Promise.reject(refreshError);
+    }
   },
 );
