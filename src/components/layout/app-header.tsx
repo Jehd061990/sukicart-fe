@@ -1,16 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, Menu, Search, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { authService } from "@/lib/api/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
+import { useCartStore } from "@/store/cart.store";
 
 export function AppHeader() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const clearAuth = useAuthStore((state) => state.clearAuth);
+  const itemCount = useCartStore((state) =>
+    state.items.reduce((sum, item) => sum + item.quantity, 0),
+  );
 
   const handleLogout = async () => {
     try {
@@ -45,6 +49,20 @@ export function AppHeader() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            className="relative"
+            aria-label="Open cart"
+            onClick={() => router.push("/cart")}
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {itemCount > 0 ? (
+              <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {itemCount}
+              </span>
+            ) : null}
+          </Button>
+
           <Button variant="ghost" size="icon" aria-label="Notifications">
             <Bell className="h-5 w-5" />
           </Button>

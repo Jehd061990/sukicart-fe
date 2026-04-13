@@ -4,6 +4,10 @@ export type OrderStatus =
   | "pending"
   | "accepted"
   | "preparing"
+  | "ready_for_pickup"
+  | "assigned_to_rider"
+  | "arrived_at_seller"
+  | "picked_up"
   | "out_for_delivery"
   | "delivered";
 
