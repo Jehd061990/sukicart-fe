@@ -1,6 +1,9 @@
 export type OrderStatus =
   | "pending"
+  | "searching_rider"
   | "accepted"
+  | "delivering"
+  | "completed"
   | "preparing"
   | "ready_for_pickup"
   | "assigned_to_rider"
@@ -39,3 +42,31 @@ export interface LocationUpdatedEvent {
 }
 
 export type TrackingUpdatedEvent = DeliveryTrackingOrder;
+
+export interface NewOrderRequestEvent {
+  orderId: string;
+  buyerId: string | null;
+  sellerId: string | null;
+  items: Array<{
+    productId: string;
+    name: string;
+    unit: "kg" | "pcs";
+    quantity: number;
+    price: number;
+    lineTotal: number;
+  }>;
+  totalAmount: number;
+  pickupLocation: GeoLocation | null;
+  sellerLocation: GeoLocation | null;
+  deliveryAddress: GeoLocation | null;
+  distanceKm: number;
+  expiresInSec: number;
+}
+
+export interface OrderStatusUpdateEvent {
+  orderId: string;
+  status: OrderStatus;
+  riderId?: string | null;
+  riderName?: string;
+  message?: string;
+}

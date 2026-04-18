@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCartStore } from "@/store/cart.store";
 
 export function CartPanel() {
+  const router = useRouter();
   const items = useCartStore((state) => state.items);
   const increaseQuantity = useCartStore((state) => state.increaseQuantity);
   const decreaseQuantity = useCartStore((state) => state.decreaseQuantity);
@@ -84,6 +86,15 @@ export function CartPanel() {
           </span>
         </CardContent>
       </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => router.push("/buyer/checkout")}
+          disabled={items.length === 0}
+        >
+          Proceed to Checkout
+        </Button>
+      </div>
     </section>
   );
 }

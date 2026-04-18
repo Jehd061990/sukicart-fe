@@ -2,14 +2,17 @@ import { OrderStatus } from "@/types/delivery";
 
 const ORDER_STATUSES: OrderStatus[] = [
   "pending",
+  "searching_rider",
   "accepted",
   "preparing",
   "ready_for_pickup",
   "assigned_to_rider",
   "arrived_at_seller",
   "picked_up",
+  "delivering",
   "out_for_delivery",
   "delivered",
+  "completed",
 ];
 
 interface OrderStatusTimelineProps {
