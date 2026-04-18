@@ -15,11 +15,10 @@ import { z } from "zod";
 
 const loginFormSchema = z.object({
   email: z
-    .string({ required_error: "Email is required" })
+    .string()
+    .min(1, "Email is required")
     .email("Please enter a valid email"),
-  password: z
-    .string({ required_error: "Password is required" })
-    .min(1, "Password is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;

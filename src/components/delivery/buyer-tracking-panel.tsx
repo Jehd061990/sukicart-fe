@@ -177,9 +177,9 @@ export function BuyerTrackingPanel() {
             <h2 className="text-base font-semibold">Tracking Info</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Order:{" "}
-                {showRiderLocation
-                  ? order?.riderId || "Unassigned"
-                  : "Hidden until out_for_delivery"}
+              {showRiderLocation
+                ? order?.riderId || "Unassigned"
+                : "Hidden until out_for_delivery"}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Status:{" "}
