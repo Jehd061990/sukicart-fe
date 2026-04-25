@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { useCartStore } from "@/store/cart.store";
 
-export function AppHeader() {
+interface AppHeaderProps {
+  onOpenMenu?: () => void;
+}
+
+export function AppHeader({ onOpenMenu }: AppHeaderProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const clearAuth = useAuthStore((state) => state.clearAuth);
@@ -32,13 +36,14 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-sm">
-      <div className="flex h-16 items-center justify-between gap-3 px-4 md:px-6">
+      <div className="flex min-h-16 items-center justify-between gap-2 px-3 py-2 md:px-6">
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
             size="icon"
             className="md:hidden"
             aria-label="Open menu"
+            onClick={onOpenMenu}
           >
             <Menu className="h-4 w-4" />
           </Button>
@@ -48,7 +53,7 @@ export function AppHeader() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <Button
             variant="ghost"
             className="relative"
@@ -63,15 +68,25 @@ export function AppHeader() {
             ) : null}
           </Button>
 
-          <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Notifications"
+            className="hidden sm:inline-flex"
+          >
             <Bell className="h-5 w-5" />
           </Button>
           {user ? (
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex"
+              onClick={handleLogout}
+            >
               Logout
             </Button>
           ) : null}
-          <div className="rounded-lg border bg-card px-3 py-1.5 text-right">
+          <div className="hidden rounded-lg border bg-card px-3 py-1.5 text-right sm:block">
             <p className="text-sm font-medium">{user?.name || "Guest"}</p>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               {user?.role || "not signed in"}
