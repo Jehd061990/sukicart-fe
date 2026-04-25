@@ -70,3 +70,20 @@ export interface CreateRiderPayload {
   phoneNumber: string;
   isActive?: boolean;
 }
+
+export interface AdminRiderAssignmentCandidate {
+  index: number;
+  riderId: string;
+  riderName: string;
+  distanceKm: number;
+}
+
+export interface AdminRiderAssignment {
+  orderId: string;
+  fallbackStatus: string;
+  currentIndex: number;
+  currentRiderId: string | null;
+  remainingOfferMs: number | null;
+  candidateCount: number;
+  candidates: AdminRiderAssignmentCandidate[];
+}

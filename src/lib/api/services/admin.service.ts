@@ -4,6 +4,7 @@ import {
   AdminDashboardStats,
   AdminOrder,
   AdminRider,
+  AdminRiderAssignment,
   AdminSeller,
   CreateRiderPayload,
   OrderStatus,
@@ -100,5 +101,20 @@ export const adminService = {
       { status },
     );
     return data;
+  },
+
+  getRiderAssignments: async (orderId?: string) => {
+    if (orderId) {
+      const { data } = await apiClient.get<{
+        assignment: AdminRiderAssignment | null;
+      }>(`/admin/rider-assignments/${orderId}`);
+
+      return data.assignment ? [data.assignment] : [];
+    }
+
+    const { data } = await apiClient.get<{
+      assignments: AdminRiderAssignment[];
+    }>("/admin/rider-assignments");
+    return data.assignments;
   },
 };

@@ -79,7 +79,7 @@ export default function RiderAcceptOrderPage() {
     [activeOrderId],
   );
 
-  const socketRef = useRiderAssignmentSocket({
+  const assignmentSocket = useRiderAssignmentSocket({
     onNewOrderRequest,
     onOrderStatusUpdate,
   });
@@ -121,19 +121,19 @@ export default function RiderAcceptOrderPage() {
   }, [incomingOrder, secondsLeft]);
 
   useEffect(() => {
-    if (!socketRef.current || !navigator.geolocation) {
+    if (!assignmentSocket || !navigator.geolocation) {
       return;
     }
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        socketRef.current?.emit("rider_location_update", {
+        assignmentSocket.emit("rider_location_update", {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         });
 
         if (activeOrderId) {
-          socketRef.current?.emit("rider:updateLocation", {
+          assignmentSocket.emit("rider:updateLocation", {
             orderId: activeOrderId,
             lat: position.coords.latitude,
             lng: position.coords.longitude,
@@ -151,7 +151,7 @@ export default function RiderAcceptOrderPage() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [socketRef, activeOrderId]);
+  }, [assignmentSocket, activeOrderId]);
 
   useEffect(() => {
     orderService
@@ -328,7 +328,7 @@ export default function RiderAcceptOrderPage() {
   };
 
   const respondToOrder = (decision: "accept_order" | "decline_order") => {
-    if (!incomingOrder || !socketRef.current) {
+    if (!incomingOrder || !assignmentSocket) {
       return;
     }
 
@@ -340,7 +340,7 @@ export default function RiderAcceptOrderPage() {
 
     setIsResponding(true);
 
-    socketRef.current.emit(
+    assignmentSocket.emit(
       decision,
       { orderId: incomingOrder.orderId },
       (response: { success: boolean; message?: string }) => {

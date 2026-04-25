@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { BuyerManagementTable } from "@/components/admin/buyer-management-table";
 import { OrderManagementTable } from "@/components/admin/order-management-table";
+import { RiderAssignmentDebugPanel } from "@/components/admin/rider-assignment-debug-panel";
 import { RiderManagementTable } from "@/components/admin/rider-management-table";
 import { SellerManagementTable } from "@/components/admin/seller-management-table";
 import { StatsGrid } from "@/components/admin/stats-grid";
+import { adminService } from "@/lib/api/services/admin.service";
 import { useAuthStore } from "@/store/auth.store";
 import { useAdminStore } from "@/store/admin.store";
-import { AdminSeller, OrderStatus } from "@/types/admin";
+import { AdminRiderAssignment, AdminSeller, OrderStatus } from "@/types/admin";
 
 const parseErrorMessage = (error: unknown, fallback: string) => {
   if (
@@ -56,7 +58,33 @@ export default function AdminDashboardPage() {
     null,
   );
   const [orderFilter, setOrderFilter] = useState<"all" | OrderStatus>("all");
+  const [assignmentFilterInput, setAssignmentFilterInput] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState("");
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentError, setAssignmentError] = useState("");
+  const [assignments, setAssignments] = useState<AdminRiderAssignment[]>([]);
   const isAdmin = hydrated && user?.role === "ADMIN";
+
+  const fetchAssignments = async (orderId = assignmentFilter) => {
+    if (!isAdmin) {
+      return;
+    }
+
+    try {
+      setAssignmentLoading(true);
+      setAssignmentError("");
+      const nextAssignments = await adminService.getRiderAssignments(
+        orderId || undefined,
+      );
+      setAssignments(nextAssignments);
+    } catch (error) {
+      setAssignmentError(
+        parseErrorMessage(error, "Failed to load rider assignment state"),
+      );
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!hydrated) {
@@ -84,6 +112,20 @@ export default function AdminDashboardPage() {
       toast.error(parseErrorMessage(error, "Failed to load admin dashboard"));
     });
   }, [fetchDashboardData, isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
+    fetchAssignments(assignmentFilter);
+
+    const poller = setInterval(() => {
+      fetchAssignments(assignmentFilter);
+    }, 10_000);
+
+    return () => clearInterval(poller);
+  }, [isAdmin, assignmentFilter]);
 
   const hasAnyLoading = useMemo(
     () =>
@@ -123,6 +165,25 @@ export default function AdminDashboardPage() {
       </header>
 
       <StatsGrid stats={stats} isLoading={loading.stats} />
+
+      <RiderAssignmentDebugPanel
+        assignments={assignments}
+        isLoading={assignmentLoading}
+        error={assignmentError}
+        filterValue={assignmentFilterInput}
+        activeFilter={assignmentFilter}
+        onFilterChange={setAssignmentFilterInput}
+        onApplyFilter={() => {
+          setAssignmentFilter(assignmentFilterInput.trim());
+        }}
+        onClearFilter={() => {
+          setAssignmentFilterInput("");
+          setAssignmentFilter("");
+        }}
+        onRefresh={() => {
+          fetchAssignments(assignmentFilter);
+        }}
+      />
 
       <SellerManagementTable
         sellers={sellers}
