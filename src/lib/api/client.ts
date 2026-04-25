@@ -1,8 +1,12 @@
 import axios from "axios";
 import { useAuthStore } from "@/store/auth.store";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:5000/api"
+    : "https://sukicart-be.onrender.com/api";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

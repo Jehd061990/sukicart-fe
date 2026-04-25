@@ -5,6 +5,11 @@ import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/auth.store";
 import { NewOrderRequestEvent, OrderStatusUpdateEvent } from "@/types/delivery";
 
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:5000/api"
+    : "https://sukicart-be.onrender.com/api";
+
 interface UseRiderAssignmentSocketOptions {
   onNewOrderRequest?: (payload: NewOrderRequestEvent) => void;
   onOrderStatusUpdate?: (payload: OrderStatusUpdateEvent) => void;
@@ -23,7 +28,7 @@ export const useRiderAssignmentSocket = ({
     }
 
     const socketUrl = (
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
+      process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL
     ).replace(/\/api\/?$/, "");
 
     const socket = io(socketUrl, {

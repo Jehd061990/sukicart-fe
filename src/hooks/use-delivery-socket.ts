@@ -9,6 +9,11 @@ import {
   TrackingUpdatedEvent,
 } from "@/types/delivery";
 
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:5000/api"
+    : "https://sukicart-be.onrender.com/api";
+
 interface UseDeliverySocketOptions {
   orderId: string;
   onLocationUpdated?: (payload: LocationUpdatedEvent) => void;
@@ -33,7 +38,7 @@ export const useDeliverySocket = ({
     }
 
     const socketUrl = (
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
+      process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL
     ).replace(/\/api\/?$/, "");
 
     const socket = io(socketUrl, {
