@@ -317,12 +317,34 @@ export function SellerTrackingPanel() {
       null
     : null;
 
+  useEffect(() => {
+    if (!selectedOrder || !latestSelectedOrder) {
+      return;
+    }
+
+    const selectedRiderId = selectedOrder.rider?.id || "";
+    const latestRiderId = latestSelectedOrder.rider?.id || "";
+
+    if (
+      selectedOrder.status !== latestSelectedOrder.status ||
+      selectedRiderId !== latestRiderId
+    ) {
+      setSelectedOrder(latestSelectedOrder);
+    }
+  }, [selectedOrder, latestSelectedOrder]);
+
   const statusMismatchDebugInfo =
     selectedOrder &&
     latestSelectedOrder &&
     selectedOrder.status !== latestSelectedOrder.status
       ? `Local: ${selectedOrder.status} | Latest API: ${latestSelectedOrder.status}`
       : null;
+
+  const canShowPickupQrForLegacyAccepted =
+    selectedOrder?.status === "accepted" && Boolean(selectedOrder?.rider);
+
+  const canShowPickupQrCompat =
+    canShowPickupQr || canShowPickupQrForLegacyAccepted;
 
   return (
     <div className="space-y-4">
@@ -515,7 +537,7 @@ export function SellerTrackingPanel() {
               </div>
             </div>
 
-            {canShowPickupQr ? (
+            {canShowPickupQrCompat ? (
               <div className="mt-4 space-y-3 rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-semibold">Pickup QR Handoff</h4>

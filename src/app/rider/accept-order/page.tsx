@@ -48,6 +48,7 @@ const PICKUP_STATUSES: OrderStatus[] = [
 ];
 
 const PICKUP_VERIFICATION_STATUSES: OrderStatus[] = [
+  "accepted",
   "ready_for_pickup",
   "assigned_to_rider",
   "arrived_at_seller",
