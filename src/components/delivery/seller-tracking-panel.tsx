@@ -210,10 +210,16 @@ export function SellerTrackingPanel() {
 
     try {
       setIsUpdatingOrder(true);
-      await orderService.updateOrderStatus(selectedOrder.id, "preparing");
+      const response = (await orderService.updateOrderStatus(
+        selectedOrder.id,
+        "preparing",
+      )) as { order?: { status?: MarketplaceOrder["status"] } };
       toast.success("Order is now preparing");
       await sellerOrdersQuery.refetch();
-      setSelectedOrder({ ...selectedOrder, status: "preparing" });
+      setSelectedOrder({
+        ...selectedOrder,
+        status: response.order?.status || "preparing",
+      });
       setActiveOrderId(selectedOrder.id);
       setLiveOrder(null);
     } catch (error) {
@@ -230,13 +236,16 @@ export function SellerTrackingPanel() {
 
     try {
       setIsUpdatingOrder(true);
-      await orderService.updateOrderStatus(
+      const response = (await orderService.updateOrderStatus(
         selectedOrder.id,
         "ready_for_pickup",
-      );
+      )) as { order?: { status?: MarketplaceOrder["status"] } };
       toast.success("Order marked as ready for pickup");
       await sellerOrdersQuery.refetch();
-      setSelectedOrder({ ...selectedOrder, status: "ready_for_pickup" });
+      setSelectedOrder({
+        ...selectedOrder,
+        status: response.order?.status || "ready_for_pickup",
+      });
       setShowCancelReasonInput(false);
       setCancelReason("");
       setActiveOrderId(selectedOrder.id);
