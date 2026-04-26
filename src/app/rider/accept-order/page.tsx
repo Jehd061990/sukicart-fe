@@ -119,11 +119,8 @@ export default function RiderAcceptOrderPage() {
   const pendingOfferQuery = useQuery({
     queryKey: ["rider-pending-offer"],
     queryFn: () => orderService.getPendingRiderOffer(),
-    enabled: Boolean(assignmentSocket) && !activeOrderId,
-    refetchInterval:
-      Boolean(assignmentSocket) && !activeOrderId && !incomingOrder
-        ? 4000
-        : false,
+    enabled: !activeOrderId,
+    refetchInterval: !activeOrderId && !incomingOrder ? 4000 : false,
   });
 
   useDeliverySocket({
@@ -223,6 +220,38 @@ export default function RiderAcceptOrderPage() {
       })
       .catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (activeOrderId || incomingOrder) {
+      return;
+    }
+
+    const syncAssignedOrder = () => {
+      orderService
+        .getMyOrders(5)
+        .then((orders) => {
+          const assigned = orders.find(
+            (order) =>
+              order.rider &&
+              order.status !== "completed" &&
+              order.status !== "delivered",
+          );
+
+          if (assigned) {
+            setIncomingOrder(null);
+            setActiveOrderId(assigned.id);
+            setLatestStatus(assigned.status);
+            setIsMapVisible(true);
+          }
+        })
+        .catch(() => null);
+    };
+
+    const intervalId = window.setInterval(syncAssignedOrder, 6000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeOrderId, incomingOrder]);
 
   useEffect(() => {
     if (incomingOrder || activeOrderId) {

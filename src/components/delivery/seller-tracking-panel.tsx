@@ -71,6 +71,7 @@ export function SellerTrackingPanel() {
   const sellerOrdersQuery = useQuery({
     queryKey: ["seller-orders", "latest"],
     queryFn: () => orderService.getMyOrders(20),
+    refetchInterval: 5000,
   });
 
   const onTrackingUpdated = useCallback((payload: TrackingUpdatedEvent) => {
