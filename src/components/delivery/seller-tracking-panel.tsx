@@ -279,9 +279,14 @@ export function SellerTrackingPanel() {
   const canTrackRider = (status: MarketplaceOrder["status"]) =>
     TRACKABLE_ORDER_STATUSES.has(status as OrderStatus);
 
+  const isAcceptedWithAssignedRider =
+    selectedOrder?.status === "accepted" && Boolean(selectedOrder?.rider);
+
   const canPrepareOrder =
     selectedOrder &&
-    ["pending", "searching_rider", "accepted"].includes(selectedOrder.status);
+    (selectedOrder.status === "pending" ||
+      selectedOrder.status === "searching_rider" ||
+      (selectedOrder.status === "accepted" && !isAcceptedWithAssignedRider));
 
   const isPreparingOrder = selectedOrder?.status === "preparing";
 
