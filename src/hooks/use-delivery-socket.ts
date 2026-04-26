@@ -46,8 +46,12 @@ export const useDeliverySocket = ({
     ).replace(/\/api\/?$/, "");
 
     const socket = io(socketUrl, {
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       auth: { token },
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     socketRef.current = socket;
