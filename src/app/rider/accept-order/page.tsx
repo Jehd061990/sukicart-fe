@@ -112,6 +112,7 @@ export default function RiderAcceptOrderPage() {
     queryKey: ["rider-order-tracking", activeOrderId],
     queryFn: () => deliveryService.getOrderTracking(activeOrderId),
     enabled: Boolean(activeOrderId),
+    refetchInterval: activeOrderId ? 5000 : false,
   });
 
   useDeliverySocket({
@@ -212,7 +213,21 @@ export default function RiderAcceptOrderPage() {
       .catch(() => null);
   }, []);
 
-  const trackedOrder = liveOrder || trackingQuery.data?.order || null;
+  const trackedOrder = useMemo(() => {
+    const queryOrder = trackingQuery.data?.order || null;
+    if (!liveOrder) {
+      return queryOrder;
+    }
+
+    if (!queryOrder) {
+      return liveOrder;
+    }
+
+    const liveUpdatedAt = new Date(liveOrder.updatedAt || 0).getTime();
+    const queryUpdatedAt = new Date(queryOrder.updatedAt || 0).getTime();
+
+    return queryUpdatedAt >= liveUpdatedAt ? queryOrder : liveOrder;
+  }, [liveOrder, trackingQuery.data?.order]);
   const riderLocation =
     localRiderLocation || trackedOrder?.riderLocation || null;
   const showPickupTarget = trackedOrder
