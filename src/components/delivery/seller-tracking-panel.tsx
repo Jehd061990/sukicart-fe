@@ -312,6 +312,18 @@ export function SellerTrackingPanel() {
     selectedOrder &&
     PICKUP_QR_VISIBLE_STATUSES.has(selectedOrder.status as OrderStatus);
 
+  const latestSelectedOrder = selectedOrder
+    ? sellerOrdersQuery.data?.find((item) => item.id === selectedOrder.id) ||
+      null
+    : null;
+
+  const statusMismatchDebugInfo =
+    selectedOrder &&
+    latestSelectedOrder &&
+    selectedOrder.status !== latestSelectedOrder.status
+      ? `Local: ${selectedOrder.status} | Latest API: ${latestSelectedOrder.status}`
+      : null;
+
   return (
     <div className="space-y-4">
       <section className="rounded-xl border bg-card p-4 shadow-sm">
@@ -475,6 +487,11 @@ export function SellerTrackingPanel() {
                 <span className="text-muted-foreground">Created:</span>{" "}
                 {new Date(selectedOrder.createdAt).toLocaleString()}
               </p>
+              {statusMismatchDebugInfo ? (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                  Debug status mismatch: {statusMismatchDebugInfo}
+                </p>
+              ) : null}
             </div>
 
             <div className="mt-4">
