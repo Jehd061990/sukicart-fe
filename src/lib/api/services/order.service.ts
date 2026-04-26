@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import { NewOrderRequestEvent } from "@/types/delivery";
 import {
   CheckoutOrderPayload,
   CreateOrderResponse,
@@ -20,6 +21,13 @@ export const orderService = {
       `/orders/mine?limit=${limit}`,
     );
     return data.orders;
+  },
+
+  getPendingRiderOffer: async () => {
+    const { data } = await apiClient.get<{
+      offer: NewOrderRequestEvent | null;
+    }>("/orders/rider/pending-offer");
+    return data.offer;
   },
 
   acceptOrder: async (orderId: string) => {

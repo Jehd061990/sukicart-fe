@@ -116,6 +116,16 @@ export default function RiderAcceptOrderPage() {
     refetchInterval: activeOrderId ? 5000 : false,
   });
 
+  const pendingOfferQuery = useQuery({
+    queryKey: ["rider-pending-offer"],
+    queryFn: () => orderService.getPendingRiderOffer(),
+    enabled: Boolean(assignmentSocket) && !activeOrderId,
+    refetchInterval:
+      Boolean(assignmentSocket) && !activeOrderId && !incomingOrder
+        ? 4000
+        : false,
+  });
+
   useDeliverySocket({
     orderId: activeOrderId,
     onTrackingUpdated: (payload) => setLiveOrder(payload),
@@ -213,6 +223,22 @@ export default function RiderAcceptOrderPage() {
       })
       .catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (incomingOrder || activeOrderId) {
+      return;
+    }
+
+    const offer = pendingOfferQuery.data;
+    if (!offer) {
+      return;
+    }
+
+    setIncomingOrder(offer);
+    setSecondsLeft(offer.expiresInSec || 10);
+    setIsResponding(false);
+    setLatestStatus("incoming order");
+  }, [pendingOfferQuery.data, incomingOrder, activeOrderId]);
 
   const trackedOrder = useMemo(() => {
     const queryOrder = trackingQuery.data?.order || null;
