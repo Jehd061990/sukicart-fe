@@ -56,9 +56,16 @@ export const useDeliverySocket = ({
 
     socketRef.current = socket;
 
-    if (orderId) {
+    const subscribeToOrderRoom = () => {
+      if (!orderId) {
+        return;
+      }
+
       socket.emit("order:subscribe", { orderId });
-    }
+    };
+
+    socket.on("connect", subscribeToOrderRoom);
+    subscribeToOrderRoom();
 
     socket.on("order:trackingUpdated", (payload: TrackingUpdatedEvent) => {
       if (payload.orderId === orderId && onTrackingUpdated) {
@@ -109,6 +116,7 @@ export const useDeliverySocket = ({
     });
 
     return () => {
+      socket.off("connect", subscribeToOrderRoom);
       socket.disconnect();
       socketRef.current = null;
     };

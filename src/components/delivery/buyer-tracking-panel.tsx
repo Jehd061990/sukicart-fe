@@ -38,6 +38,7 @@ export function BuyerTrackingPanel() {
     queryKey: ["buyer-tracking", activeOrderId],
     queryFn: () => deliveryService.getOrderTracking(activeOrderId),
     enabled: Boolean(activeOrderId),
+    refetchInterval: activeOrderId ? 4000 : false,
   });
 
   const onTrackingUpdated = useCallback((payload: TrackingUpdatedEvent) => {
@@ -61,7 +62,21 @@ export function BuyerTrackingPanel() {
     onOrderChanged,
   });
 
-  const order = liveOrder || trackingQuery.data?.order || null;
+  const order = useMemo(() => {
+    const queryOrder = trackingQuery.data?.order || null;
+    if (!liveOrder) {
+      return queryOrder;
+    }
+
+    if (!queryOrder) {
+      return liveOrder;
+    }
+
+    const liveUpdatedAt = new Date(liveOrder.updatedAt || 0).getTime();
+    const queryUpdatedAt = new Date(queryOrder.updatedAt || 0).getTime();
+
+    return queryUpdatedAt >= liveUpdatedAt ? queryOrder : liveOrder;
+  }, [liveOrder, trackingQuery.data?.order]);
   const targetLocation = getTargetLocation(order);
   const showRiderLocation = order?.status === "out_for_delivery";
 
