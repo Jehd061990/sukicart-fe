@@ -78,14 +78,14 @@ export function AppSidebar({
       </aside>
 
       {mobileOpen ? (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-2000 md:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-black/40"
             aria-label="Close menu overlay"
             onClick={onMobileClose}
           />
-          <aside className="relative h-full w-[84%] max-w-xs border-r bg-card p-4 shadow-xl">
+          <aside className="relative z-10 h-full w-[84%] max-w-xs border-r bg-card p-4 shadow-xl">
             {sidebarContent}
           </aside>
         </div>

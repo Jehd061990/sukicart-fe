@@ -94,6 +94,20 @@ export function AppHeader({ onOpenMenu }: AppHeaderProps) {
           </div>
         </div>
       </div>
+
+      {user ? (
+        <div className="flex items-center justify-between gap-3 border-t px-3 py-2 sm:hidden">
+          <div>
+            <p className="text-sm font-medium leading-tight">{user.name}</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {user.role}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            Logout
+          </Button>
+        </div>
+      ) : null}
     </header>
   );
 }
