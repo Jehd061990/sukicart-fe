@@ -129,3 +129,8 @@
     @apply font-sans;
   }
 }
+
+/* Keep map panes/controls below sticky app chrome (header/sidebar overlays). */
+.leaflet-container {
+  z-index: 0;
+}
