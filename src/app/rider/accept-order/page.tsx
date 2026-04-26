@@ -11,11 +11,30 @@ import { deliveryService } from "@/lib/api/services/delivery.service";
 import { TrackingMap } from "@/components/delivery/tracking-map";
 import {
   NewOrderRequestEvent,
+  GeoLocation,
   OrderStatus,
   OrderStatusUpdateEvent,
   TrackingUpdatedEvent,
 } from "@/types/delivery";
-import { FALLBACK_LOCATION } from "@/lib/delivery/tracking";
+import { FALLBACK_LOCATION, hasCoords } from "@/lib/delivery/tracking";
+
+const ARRIVED_AT_BUYER_THRESHOLD_METERS = 120;
+
+const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+const haversineMeters = (a: GeoLocation, b: GeoLocation) => {
+  const earthRadiusMeters = 6371000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const x =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+};
 
 const toStatusLabel = (status: string) =>
   status.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -53,9 +72,14 @@ export default function RiderAcceptOrderPage() {
   const [latestStatus, setLatestStatus] = useState("waiting");
   const [isMapVisible, setIsMapVisible] = useState(false);
   const [liveOrder, setLiveOrder] = useState<TrackingUpdatedEvent | null>(null);
+  const [localRiderLocation, setLocalRiderLocation] =
+    useState<GeoLocation | null>(null);
   const [pickupCode, setPickupCode] = useState("");
   const [scannedQrValue, setScannedQrValue] = useState("");
   const [isVerifyingPickup, setIsVerifyingPickup] = useState(false);
+  const [isUpdatingRiderStatus, setIsUpdatingRiderStatus] = useState<
+    "arrived" | "complete" | null
+  >(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState("");
 
@@ -127,6 +151,14 @@ export default function RiderAcceptOrderPage() {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        const nextRiderLocation: GeoLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          updatedAt: new Date().toISOString(),
+        };
+
+        setLocalRiderLocation(nextRiderLocation);
+
         assignmentSocket.emit("rider_location_update", {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -173,6 +205,8 @@ export default function RiderAcceptOrderPage() {
   }, []);
 
   const trackedOrder = liveOrder || trackingQuery.data?.order || null;
+  const riderLocation =
+    localRiderLocation || trackedOrder?.riderLocation || null;
   const showPickupTarget = trackedOrder
     ? PICKUP_STATUSES.includes(trackedOrder.status)
     : true;
@@ -193,6 +227,65 @@ export default function RiderAcceptOrderPage() {
     }),
     [trackedOrder, showPickupTarget],
   );
+
+  const distanceToBuyerMeters = useMemo(() => {
+    if (!hasCoords(riderLocation) || !hasCoords(trackedOrder?.buyerLocation)) {
+      return null;
+    }
+
+    return haversineMeters(riderLocation!, trackedOrder!.buyerLocation!);
+  }, [riderLocation, trackedOrder]);
+
+  const canAttemptArrivalStatus =
+    trackedOrder?.status === "out_for_delivery" ||
+    trackedOrder?.status === "picked_up" ||
+    trackedOrder?.status === "delivering";
+
+  const canMarkArrivedAtBuyer =
+    Boolean(activeOrderId) &&
+    Boolean(trackedOrder) &&
+    canAttemptArrivalStatus &&
+    distanceToBuyerMeters !== null &&
+    distanceToBuyerMeters <= ARRIVED_AT_BUYER_THRESHOLD_METERS;
+
+  const canCompleteOrder =
+    Boolean(activeOrderId) &&
+    (trackedOrder?.status === "arrived_at_buyer" ||
+      trackedOrder?.status === "delivered" ||
+      trackedOrder?.status === "completed");
+
+  const handleRiderStatusUpdate = async (nextStatus: OrderStatus) => {
+    if (!activeOrderId) {
+      return;
+    }
+
+    const action = nextStatus === "arrived_at_buyer" ? "arrived" : "complete";
+
+    try {
+      setIsUpdatingRiderStatus(action);
+      const response = await deliveryService.updateRiderOrderStatus(
+        activeOrderId,
+        nextStatus,
+      );
+
+      if (response?.order) {
+        setLiveOrder(response.order as TrackingUpdatedEvent);
+        setLatestStatus(response.order.status);
+      }
+
+      toast.success(
+        nextStatus === "arrived_at_buyer"
+          ? "Marked as arrived at buyer"
+          : "Order marked complete",
+      );
+
+      await trackingQuery.refetch();
+    } catch {
+      toast.error("Unable to update rider status");
+    } finally {
+      setIsUpdatingRiderStatus(null);
+    }
+  };
 
   const stopScanner = useCallback(() => {
     if (scannerRafRef.current !== null) {
@@ -420,6 +513,51 @@ export default function RiderAcceptOrderPage() {
             >
               {isMapVisible ? "Hide Pickup Map" : "View Active Order Map"}
             </Button>
+          </div>
+        ) : null}
+
+        {activeOrderId ? (
+          <div className="mt-3 space-y-2 rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground">
+              Distance to buyer:{" "}
+              <span className="font-medium text-foreground">
+                {distanceToBuyerMeters === null
+                  ? "Unavailable"
+                  : `${Math.round(distanceToBuyerMeters)} m`}
+              </span>
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleRiderStatusUpdate("arrived_at_buyer")}
+                disabled={
+                  !canMarkArrivedAtBuyer || isUpdatingRiderStatus !== null
+                }
+              >
+                {isUpdatingRiderStatus === "arrived"
+                  ? "Updating..."
+                  : "Arrived at Buyer"}
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleRiderStatusUpdate("completed")}
+                disabled={!canCompleteOrder || isUpdatingRiderStatus !== null}
+              >
+                {isUpdatingRiderStatus === "complete"
+                  ? "Completing..."
+                  : "Complete Order"}
+              </Button>
+            </div>
+
+            {!canMarkArrivedAtBuyer && canAttemptArrivalStatus ? (
+              <p className="text-xs text-muted-foreground">
+                Arrived button enables within{" "}
+                {ARRIVED_AT_BUYER_THRESHOLD_METERS}m of buyer location.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
