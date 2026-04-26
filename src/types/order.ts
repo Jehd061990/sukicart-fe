@@ -12,6 +12,7 @@ export type MarketplaceOrderStatus =
   | "arrived_at_seller"
   | "picked_up"
   | "out_for_delivery"
+  | "arrived_at_buyer"
   | "delivered";
 
 export interface CheckoutItemPayload {

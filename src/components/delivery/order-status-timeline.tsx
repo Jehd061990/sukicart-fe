@@ -11,6 +11,7 @@ const ORDER_STATUSES: OrderStatus[] = [
   "picked_up",
   "delivering",
   "out_for_delivery",
+  "arrived_at_buyer",
   "delivered",
   "completed",
 ];

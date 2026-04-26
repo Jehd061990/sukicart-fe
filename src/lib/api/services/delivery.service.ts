@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/client";
-import { DeliveryTrackingOrder } from "@/types/delivery";
+import { DeliveryTrackingOrder, OrderStatus } from "@/types/delivery";
 
 export const deliveryService = {
   getOrderTracking: async (orderId: string) => {
@@ -13,6 +13,14 @@ export const deliveryService = {
     const { data } = await apiClient.patch<{ order: DeliveryTrackingOrder }>(
       `/orders/${orderId}/rider-location`,
       { lat, lng },
+    );
+    return data;
+  },
+
+  updateRiderOrderStatus: async (orderId: string, status: OrderStatus) => {
+    const { data } = await apiClient.patch<{ order: DeliveryTrackingOrder }>(
+      `/orders/${orderId}/rider-status`,
+      { status },
     );
     return data;
   },

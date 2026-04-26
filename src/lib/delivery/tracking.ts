@@ -13,6 +13,7 @@ export const FALLBACK_LOCATION: GeoLocation = {
 const BUYER_TARGET_STATUSES: OrderStatus[] = [
   "picked_up",
   "out_for_delivery",
+  "arrived_at_buyer",
   "delivered",
 ];
 

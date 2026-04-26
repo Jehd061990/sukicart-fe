@@ -109,8 +109,14 @@ export function RiderMapInner({
   }, [autoUpdateMs, onRiderLocationUpdate]);
 
   const normalizedStatus = String(orderStatus || "").toUpperCase();
-  const showSeller = normalizedStatus !== "PICKED_UP";
-  const showBuyer = normalizedStatus === "PICKED_UP";
+  const showBuyer = [
+    "PICKED_UP",
+    "OUT_FOR_DELIVERY",
+    "ARRIVED_AT_BUYER",
+    "DELIVERED",
+    "COMPLETED",
+  ].includes(normalizedStatus);
+  const showSeller = !showBuyer;
 
   const destinationLocation = showBuyer ? buyerLocation : sellerLocation;
   const navigateUrl = buildGoogleMapsDirectionUrl(destinationLocation);
