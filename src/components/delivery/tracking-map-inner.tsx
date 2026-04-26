@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { icon } from "leaflet";
 import {
-  CircleMarker,
   MapContainer,
+  Marker,
   TileLayer,
   Tooltip,
   useMap,
@@ -30,31 +31,46 @@ function RecenterMap({ focusLocation }: { focusLocation: GeoLocation }) {
   return null;
 }
 
-function LocationMarker({
+const sellerMarkerIcon = icon({
+  iconUrl: "/icons/seller-store-marker.svg",
+  iconSize: [42, 52],
+  iconAnchor: [21, 50],
+  tooltipAnchor: [0, -40],
+});
+
+const riderMarkerIcon = icon({
+  iconUrl: "/icons/rider-motorcycle-marker.svg",
+  iconSize: [42, 52],
+  iconAnchor: [21, 50],
+  tooltipAnchor: [0, -40],
+});
+
+const buyerMarkerIcon = icon({
+  iconUrl: "/icons/buyer-marker.svg",
+  iconSize: [42, 52],
+  iconAnchor: [21, 50],
+  tooltipAnchor: [0, -40],
+});
+
+function IconLocationMarker({
   location,
-  color,
   label,
-  radius = 9,
+  markerIcon,
 }: {
   location?: GeoLocation | null;
-  color: string;
   label: string;
-  radius?: number;
+  markerIcon: ReturnType<typeof icon>;
 }) {
   if (!hasCoords(location)) {
     return null;
   }
 
   return (
-    <CircleMarker
-      center={[location!.lat, location!.lng]}
-      radius={radius}
-      pathOptions={{ color, fillOpacity: 0.8 }}
-    >
+    <Marker position={[location!.lat, location!.lng]} icon={markerIcon}>
       <Tooltip direction="top" offset={[0, -8]} permanent>
         {label}
       </Tooltip>
-    </CircleMarker>
+    </Marker>
   );
 }
 
@@ -82,17 +98,20 @@ export function TrackingMapInner({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <LocationMarker
+      <IconLocationMarker
         location={sellerLocation}
-        color="#f97316"
         label="Seller"
+        markerIcon={sellerMarkerIcon}
       />
-      <LocationMarker location={buyerLocation} color="#2563eb" label="Buyer" />
-      <LocationMarker
+      <IconLocationMarker
+        location={buyerLocation}
+        label="Buyer"
+        markerIcon={buyerMarkerIcon}
+      />
+      <IconLocationMarker
         location={riderLocation}
-        color="#16a34a"
         label="Rider"
-        radius={10}
+        markerIcon={riderMarkerIcon}
       />
       <RecenterMap focusLocation={focusLocation} />
     </MapContainer>

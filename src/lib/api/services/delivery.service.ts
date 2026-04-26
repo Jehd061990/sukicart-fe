@@ -17,6 +17,14 @@ export const deliveryService = {
     return data;
   },
 
+  updateSellerLocation: async (orderId: string, lat: number, lng: number) => {
+    const { data } = await apiClient.patch<{ order: DeliveryTrackingOrder }>(
+      `/orders/${orderId}/seller-location`,
+      { lat, lng },
+    );
+    return data;
+  },
+
   updateRiderOrderStatus: async (orderId: string, status: OrderStatus) => {
     const { data } = await apiClient.patch<{ order: DeliveryTrackingOrder }>(
       `/orders/${orderId}/rider-status`,

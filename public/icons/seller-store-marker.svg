@@ -1,0 +1,10 @@
+<svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Seller store marker</title>
+  <path d="M14 4H34C37.3 4 40 6.7 40 10V31C40 37.6 34.6 43 28 43H27L24 54L21 43H20C13.4 43 8 37.6 8 31V10C8 6.7 10.7 4 14 4Z" fill="#EA580C"/>
+  <rect x="12" y="10" width="24" height="24" rx="8" fill="#FFFFFF"/>
+  <rect x="16" y="22" width="16" height="10" rx="1.5" fill="#FB923C"/>
+  <rect x="19" y="24" width="4" height="8" fill="#FFFFFF"/>
+  <rect x="25" y="26" width="5" height="6" fill="#FFFFFF"/>
+  <path d="M14 22L17 16H31L34 22H14Z" fill="#C2410C"/>
+  <path d="M18 16H30V14.5C30 13.7 29.3 13 28.5 13H19.5C18.7 13 18 13.7 18 14.5V16Z" fill="#9A3412"/>
+</svg>

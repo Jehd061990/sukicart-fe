@@ -1,5 +1,7 @@
 export type OrderStatus =
   | "pending"
+  | "cancelled_by_buyer"
+  | "declined_by_seller"
   | "searching_rider"
   | "accepted"
   | "delivering"
@@ -70,4 +72,11 @@ export interface OrderStatusUpdateEvent {
   riderId?: string | null;
   riderName?: string;
   message?: string;
+}
+
+export interface OrderChangedEvent {
+  orderId: string;
+  status: OrderStatus;
+  action?: "created" | "updated" | "status_changed" | "rider_assigned";
+  updatedAt?: string | Date;
 }

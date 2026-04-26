@@ -1,0 +1,7 @@
+<svg width="48" height="56" viewBox="0 0 48 56" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Buyer location marker</title>
+  <path d="M18 4H30C36.6 4 42 9.4 42 16C42 20.5 40.8 24 38 29L24 54L10 29C7.2 24 6 20.5 6 16C6 9.4 11.4 4 18 4Z" fill="#1D4ED8"/>
+  <rect x="12" y="10" width="24" height="24" rx="9" fill="#FFFFFF"/>
+  <circle cx="24" cy="19" r="3.4" fill="#1E3A8A"/>
+  <path d="M17.5 29.5C17.5 25.9 20.4 23 24 23C27.6 23 30.5 25.9 30.5 29.5V32H17.5V29.5Z" fill="#1E3A8A"/>
+</svg>

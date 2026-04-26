@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useDeliverySocket } from "@/hooks/use-delivery-socket";
-import { FALLBACK_LOCATION, getTargetLocation } from "@/lib/delivery/tracking";
+import { getTargetLocation } from "@/lib/delivery/tracking";
 import { deliveryService } from "@/lib/api/services/delivery.service";
 import { orderService } from "@/lib/api/services/order.service";
 import {
@@ -19,6 +19,7 @@ import { OrderStatusTimeline } from "@/components/delivery/order-status-timeline
 import { TrackingMap } from "@/components/delivery/tracking-map";
 
 export function BuyerTrackingPanel() {
+  const queryClient = useQueryClient();
   const [activeOrderId, setActiveOrderId] = useState("");
   const [liveOrder, setLiveOrder] = useState<TrackingUpdatedEvent | null>(null);
   const [liveRiderLocation, setLiveRiderLocation] =
@@ -47,10 +48,17 @@ export function BuyerTrackingPanel() {
     setLiveRiderLocation(payload.location);
   }, []);
 
+  const onOrderChanged = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ["buyer-orders", "latest"],
+    });
+  }, [queryClient]);
+
   useDeliverySocket({
     orderId: activeOrderId,
     onTrackingUpdated,
     onRiderLocationUpdate,
+    onOrderChanged,
   });
 
   const order = liveOrder || trackingQuery.data?.order || null;
@@ -60,7 +68,7 @@ export function BuyerTrackingPanel() {
   const mapState = useMemo(
     () => ({
       riderLocation: showRiderLocation
-        ? liveRiderLocation || order?.riderLocation || FALLBACK_LOCATION
+        ? liveRiderLocation || order?.riderLocation || null
         : null,
       sellerLocation: order?.sellerLocation || null,
       buyerLocation: order?.buyerLocation || null,

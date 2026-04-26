@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { useDeliverySocket } from "@/hooks/use-delivery-socket";
 import { orderService } from "@/lib/api/services/order.service";
 import {
-  FALLBACK_LOCATION,
   getTargetLocation,
   isBuyerTargetStatus,
 } from "@/lib/delivery/tracking";
@@ -19,6 +18,10 @@ import { MarketplaceOrder, PickupQrPayload } from "@/types/order";
 import { TrackingMap } from "@/components/delivery/tracking-map";
 
 const TRACKABLE_ORDER_STATUSES = new Set<OrderStatus>([
+  "accepted",
+  "assigned_to_rider",
+  "arrived_at_seller",
+  "picked_up",
   "ready_for_pickup",
   "out_for_delivery",
 ]);
@@ -29,7 +32,21 @@ const PICKUP_QR_VISIBLE_STATUSES = new Set<OrderStatus>([
   "arrived_at_seller",
 ]);
 
+const SELLER_LOCATION_SHARE_STATUSES = new Set<OrderStatus>([
+  "pending",
+  "searching_rider",
+  "accepted",
+  "preparing",
+  "ready_for_pickup",
+  "assigned_to_rider",
+  "arrived_at_seller",
+  "picked_up",
+  "out_for_delivery",
+  "arrived_at_buyer",
+]);
+
 export function SellerTrackingPanel() {
+  const queryClient = useQueryClient();
   const [activeOrderId, setActiveOrderId] = useState("");
   const [liveOrder, setLiveOrder] = useState<TrackingUpdatedEvent | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<MarketplaceOrder | null>(
@@ -42,6 +59,7 @@ export function SellerTrackingPanel() {
     null,
   );
   const [isLoadingPickupQr, setIsLoadingPickupQr] = useState(false);
+  const [sellerLocationShareError, setSellerLocationShareError] = useState("");
 
   const trackingQuery = useQuery({
     queryKey: ["seller-tracking", activeOrderId],
@@ -58,9 +76,16 @@ export function SellerTrackingPanel() {
     setLiveOrder(payload);
   }, []);
 
+  const onOrderChanged = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ["seller-orders", "latest"],
+    });
+  }, [queryClient]);
+
   useDeliverySocket({
     orderId: activeOrderId,
     onTrackingUpdated,
+    onOrderChanged,
   });
 
   const order = liveOrder || trackingQuery.data?.order || null;
@@ -71,13 +96,78 @@ export function SellerTrackingPanel() {
 
   const mapState = useMemo(
     () => ({
-      riderLocation: order?.riderLocation || FALLBACK_LOCATION,
+      riderLocation: order?.riderLocation || null,
       sellerLocation: order?.sellerLocation || null,
       buyerLocation: headingToBuyer ? order?.buyerLocation || null : null,
       targetLocation,
     }),
     [order, headingToBuyer, targetLocation],
   );
+
+  const shouldShareSellerLocation =
+    Boolean(activeOrderId) &&
+    (!order || SELLER_LOCATION_SHARE_STATUSES.has(order.status));
+
+  const hasLiveSellerLocation =
+    Boolean(order?.sellerLocation) &&
+    Number.isFinite(Number(order?.sellerLocation?.lat)) &&
+    Number.isFinite(Number(order?.sellerLocation?.lng));
+
+  const isSellerLocationSharingOn =
+    shouldShareSellerLocation &&
+    hasLiveSellerLocation &&
+    !sellerLocationShareError;
+
+  useEffect(() => {
+    if (!shouldShareSellerLocation || !navigator.geolocation) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const pushSellerLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          if (cancelled || !activeOrderId) {
+            return;
+          }
+
+          try {
+            await deliveryService.updateSellerLocation(
+              activeOrderId,
+              coords.latitude,
+              coords.longitude,
+            );
+            setSellerLocationShareError("");
+          } catch {
+            setSellerLocationShareError(
+              "Unable to share seller location for this order",
+            );
+          }
+        },
+        () => {
+          if (!cancelled) {
+            setSellerLocationShareError(
+              "Location permission is required to share seller location",
+            );
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5000,
+        },
+      );
+    };
+
+    pushSellerLocation();
+    const intervalId = window.setInterval(pushSellerLocation, 8000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeOrderId, shouldShareSellerLocation]);
 
   const parseError = (error: unknown, fallback: string) => {
     if (axios.isAxiosError<{ message?: string }>(error)) {
@@ -298,6 +388,26 @@ export function SellerTrackingPanel() {
               </span>
             </p>
 
+            <p className="mt-1 text-sm text-muted-foreground">
+              Seller Location Sharing:{" "}
+              <span
+                className={
+                  isSellerLocationSharingOn
+                    ? "font-medium text-emerald-600"
+                    : "font-medium text-amber-600"
+                }
+              >
+                {isSellerLocationSharingOn ? "ON" : "OFF"}
+              </span>
+            </p>
+
+            {order?.sellerLocation?.updatedAt ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Last shared:{" "}
+                {new Date(order.sellerLocation.updatedAt).toLocaleTimeString()}
+              </p>
+            ) : null}
+
             <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
               {headingToBuyer
                 ? "Rider is heading to buyer"
@@ -310,6 +420,12 @@ export function SellerTrackingPanel() {
       {trackingQuery.isError ? (
         <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           Unable to fetch seller tracking details for this order.
+        </p>
+      ) : null}
+
+      {sellerLocationShareError ? (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {sellerLocationShareError}
         </p>
       ) : null}
 

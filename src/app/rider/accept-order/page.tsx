@@ -117,6 +117,14 @@ export default function RiderAcceptOrderPage() {
   useDeliverySocket({
     orderId: activeOrderId,
     onTrackingUpdated: (payload) => setLiveOrder(payload),
+    onOrderChanged: (payload) => {
+      if (!activeOrderId || payload.orderId !== activeOrderId) {
+        return;
+      }
+
+      setLatestStatus(payload.status);
+      void trackingQuery.refetch();
+    },
   });
 
   useEffect(() => {
@@ -216,7 +224,7 @@ export default function RiderAcceptOrderPage() {
 
   const mapState = useMemo(
     () => ({
-      riderLocation: trackedOrder?.riderLocation || FALLBACK_LOCATION,
+      riderLocation: trackedOrder?.riderLocation || null,
       sellerLocation: trackedOrder?.sellerLocation || null,
       buyerLocation: showPickupTarget
         ? null

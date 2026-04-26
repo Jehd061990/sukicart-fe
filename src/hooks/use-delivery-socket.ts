@@ -5,6 +5,8 @@ import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/auth.store";
 import {
   LocationUpdatedEvent,
+  OrderChangedEvent,
+  OrderStatusUpdateEvent,
   RiderAssignedEvent,
   TrackingUpdatedEvent,
 } from "@/types/delivery";
@@ -15,11 +17,12 @@ const DEFAULT_API_BASE_URL =
     : "https://sukicart-be.onrender.com/api";
 
 interface UseDeliverySocketOptions {
-  orderId: string;
+  orderId?: string;
   onLocationUpdated?: (payload: LocationUpdatedEvent) => void;
   onRiderLocationUpdate?: (payload: LocationUpdatedEvent) => void;
   onTrackingUpdated?: (payload: TrackingUpdatedEvent) => void;
   onRiderAssigned?: (payload: RiderAssignedEvent) => void;
+  onOrderChanged?: (payload: OrderChangedEvent) => void;
 }
 
 export const useDeliverySocket = ({
@@ -28,12 +31,13 @@ export const useDeliverySocket = ({
   onRiderLocationUpdate,
   onTrackingUpdated,
   onRiderAssigned,
+  onOrderChanged,
 }: UseDeliverySocketOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const token = useAuthStore((state) => state.accessToken || state.token);
 
   useEffect(() => {
-    if (!orderId || !token) {
+    if (!token) {
       return;
     }
 
@@ -48,7 +52,9 @@ export const useDeliverySocket = ({
 
     socketRef.current = socket;
 
-    socket.emit("order:subscribe", { orderId });
+    if (orderId) {
+      socket.emit("order:subscribe", { orderId });
+    }
 
     socket.on("order:trackingUpdated", (payload: TrackingUpdatedEvent) => {
       if (payload.orderId === orderId && onTrackingUpdated) {
@@ -72,6 +78,30 @@ export const useDeliverySocket = ({
       if (payload.orderId === orderId && onRiderAssigned) {
         onRiderAssigned(payload);
       }
+
+      if (onOrderChanged) {
+        onOrderChanged({
+          orderId: payload.orderId,
+          status: "assigned_to_rider",
+          action: "rider_assigned",
+        });
+      }
+    });
+
+    socket.on("order:changed", (payload: OrderChangedEvent) => {
+      if (onOrderChanged) {
+        onOrderChanged(payload);
+      }
+    });
+
+    socket.on("order_status_update", (payload: OrderStatusUpdateEvent) => {
+      if (onOrderChanged) {
+        onOrderChanged({
+          orderId: payload.orderId,
+          status: payload.status,
+          action: "status_changed",
+        });
+      }
     });
 
     return () => {
@@ -85,6 +115,7 @@ export const useDeliverySocket = ({
     onRiderLocationUpdate,
     onTrackingUpdated,
     onRiderAssigned,
+    onOrderChanged,
   ]);
 
   return socketRef;

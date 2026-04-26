@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { divIcon, type DivIcon } from "leaflet";
+import { icon, type Icon } from "leaflet";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,13 +30,12 @@ function RecenterMap({ center }: { center: GeoLocation }) {
   return null;
 }
 
-const createRoleIcon = (label: string, bgColor: string): DivIcon =>
-  divIcon({
-    className: "",
-    html: `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9999px;border:2px solid #ffffff;background:${bgColor};color:#ffffff;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.25)">${label}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-    popupAnchor: [0, -30],
+const createAssetMarkerIcon = (iconUrl: string): Icon =>
+  icon({
+    iconUrl,
+    iconSize: [42, 52],
+    iconAnchor: [21, 50],
+    popupAnchor: [0, -44],
   });
 
 function RoleMarker({
@@ -45,7 +44,7 @@ function RoleMarker({
   label,
 }: {
   location: GeoLocation;
-  icon: DivIcon;
+  icon: Icon;
   label: string;
 }) {
   return (
@@ -123,9 +122,9 @@ export function RiderMapInner({
 
   const markerIcons = useMemo(
     () => ({
-      rider: createRoleIcon("R", "#16a34a"),
-      seller: createRoleIcon("S", "#f97316"),
-      buyer: createRoleIcon("B", "#2563eb"),
+      rider: createAssetMarkerIcon("/icons/rider-motorcycle-marker.svg"),
+      seller: createAssetMarkerIcon("/icons/seller-store-marker.svg"),
+      buyer: createAssetMarkerIcon("/icons/buyer-marker.svg"),
     }),
     [],
   );
