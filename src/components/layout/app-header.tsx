@@ -2,8 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { Bell, Menu, Search, ShoppingCart } from "lucide-react";
-import { toast } from "sonner";
-import { authService } from "@/lib/api/services/auth.service";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { useCartStore } from "@/store/cart.store";
@@ -14,25 +12,9 @@ interface AppHeaderProps {
 
 export function AppHeader({ onOpenMenu }: AppHeaderProps) {
   const router = useRouter();
-  const user = useAuthStore((state) => state.user);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
   const itemCount = useCartStore((state) =>
     state.items.reduce((sum, item) => sum + item.quantity, 0),
   );
-
-  const handleLogout = async () => {
-    try {
-      if (user) {
-        await authService.logout();
-      }
-    } catch {
-      // Clear client auth state even if API logout fails.
-    } finally {
-      clearAuth();
-      toast.success("Logged out successfully");
-      router.push("/login");
-    }
-  };
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-sm">
@@ -76,38 +58,8 @@ export function AppHeader({ onOpenMenu }: AppHeaderProps) {
           >
             <Bell className="h-5 w-5" />
           </Button>
-          {user ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden sm:inline-flex"
-              onClick={handleLogout}
-            >
-              Logout
-            </Button>
-          ) : null}
-          <div className="hidden rounded-lg border bg-card px-3 py-1.5 text-right sm:block">
-            <p className="text-sm font-medium">{user?.name || "Guest"}</p>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {user?.role || "not signed in"}
-            </p>
-          </div>
         </div>
       </div>
-
-      {user ? (
-        <div className="flex items-center justify-between gap-3 border-t px-3 py-2 sm:hidden">
-          <div>
-            <p className="text-sm font-medium leading-tight">{user.name}</p>
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              {user.role}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            Logout
-          </Button>
-        </div>
-      ) : null}
     </header>
   );
 }

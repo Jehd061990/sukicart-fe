@@ -22,14 +22,14 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex h-screen overflow-hidden bg-muted/30">
       <AppSidebar
         mobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppHeader onOpenMenu={() => setIsMobileSidebarOpen(true)} />
-        <main className="flex-1 p-3 md:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-3 md:p-6">{children}</main>
       </div>
     </div>
   );
