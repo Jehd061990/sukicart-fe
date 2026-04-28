@@ -63,13 +63,18 @@ export default function POSPage() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
       <section className="space-y-4">
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <h1 className="text-2xl font-semibold">POS</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-brand-200 bg-linear-to-br from-brand-50 via-white to-deal-50 p-4 shadow-sm">
+          <p className="inline-flex rounded-full bg-brand-100 px-3 py-1 font-sans text-xs font-medium text-brand-700">
+            Walk-in checkout
+          </p>
+          <h1 className="mt-3 font-heading text-2xl font-semibold text-brand-900 sm:text-3xl">
+            POS
+          </h1>
+          <p className="font-sans text-sm text-gray-700">
             Search products and build a walk-in customer order.
           </p>
           <Input
-            className="mt-3"
+            className="mt-3 border-brand-200 focus-visible:border-brand-500 focus-visible:ring-brand-100"
             placeholder="Search by product name or category"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -85,7 +90,7 @@ export default function POSPage() {
 
       <div className="space-y-3">
         {feedback ? (
-          <div className="rounded-lg border bg-card px-3 py-2 text-sm">
+          <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 font-sans text-sm text-gray-700">
             {feedback}
           </div>
         ) : null}

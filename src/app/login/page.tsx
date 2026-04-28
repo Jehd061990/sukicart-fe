@@ -115,13 +115,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[radial-gradient(60%_80%_at_80%_0%,rgba(16,185,129,0.18),rgba(255,255,255,0)),linear-gradient(to_bottom,#f8fff9,#fff9f3)] px-4 py-12 sm:px-6 lg:px-8">
       <section className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1.1fr,1fr]">
         <article className="rounded-3xl border border-emerald-100 bg-white/90 p-6 shadow-sm backdrop-blur-sm sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+          <p className="font-sans text-xs font-medium uppercase tracking-widest text-emerald-700">
             Login Portal
           </p>
-          <h1 className="mt-2 text-3xl font-black text-emerald-950 sm:text-4xl">
+          <h1 className="mt-2 font-heading text-3xl font-semibold text-emerald-950 sm:text-4xl">
             Access Your SukiCart Workspace
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 font-sans text-base text-gray-600">
             Choose your role and sign in using your existing account.
           </p>
 
@@ -140,10 +140,10 @@ export default function LoginPage() {
                       : "border-emerald-100 bg-white hover:bg-emerald-50/60"
                   }`}
                 >
-                  <p className="text-sm font-bold text-emerald-950">
+                  <p className="font-heading text-lg font-medium text-emerald-950">
                     {roleLabels[role]}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 font-sans text-xs text-gray-500">
                     {roleDescriptions[role]}
                   </p>
                 </button>
@@ -151,7 +151,7 @@ export default function LoginPage() {
             })}
           </div>
 
-          <p className="mt-4 text-sm text-emerald-900/85">{helperText}</p>
+          <p className="mt-4 font-sans text-sm text-gray-600">{helperText}</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <InputField
@@ -182,22 +182,22 @@ export default function LoginPage() {
             />
           </form>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
+          <div className="mt-6 flex flex-wrap items-center gap-3 font-sans text-sm">
             <Link
               href="/register/buyer"
-              className="rounded-xl border border-emerald-200 px-4 py-2 font-semibold text-emerald-700 transition hover:bg-emerald-50"
+              className="rounded-xl border border-emerald-200 px-4 py-2 font-medium text-emerald-700 transition hover:bg-emerald-50"
             >
               Create Buyer Account
             </Link>
             <Link
               href="/register/seller"
-              className="rounded-xl border border-orange-200 px-4 py-2 font-semibold text-orange-700 transition hover:bg-orange-50"
+              className="rounded-xl border border-orange-200 px-4 py-2 font-medium text-orange-700 transition hover:bg-orange-50"
             >
               Register Seller
             </Link>
             <Link
               href="/"
-              className="rounded-xl border px-4 py-2 font-semibold transition hover:bg-muted"
+              className="rounded-xl border px-4 py-2 font-medium transition hover:bg-muted"
             >
               Back to Landing Page
             </Link>
@@ -205,39 +205,47 @@ export default function LoginPage() {
         </article>
 
         <aside className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-orange-700">
+          <p className="font-sans text-xs font-medium uppercase tracking-widest text-orange-700">
             Role Guide
           </p>
-          <h2 className="mt-2 text-2xl font-black text-orange-950">
+          <h2 className="mt-2 font-heading text-xl font-medium text-orange-950 sm:text-2xl">
             Which login should I use?
           </h2>
 
           <div className="mt-5 space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-bold text-slate-950">Admin</p>
-              <p className="mt-1 text-sm text-slate-900/85">
+              <p className="font-heading text-lg font-medium text-slate-950">
+                Admin
+              </p>
+              <p className="mt-1 font-sans text-sm text-gray-600">
                 For platform administrators managing users, riders, sellers, and
                 orders.
               </p>
             </div>
 
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-              <p className="text-sm font-bold text-emerald-950">Buyer</p>
-              <p className="mt-1 text-sm text-emerald-900/85">
+              <p className="font-heading text-lg font-medium text-emerald-950">
+                Buyer
+              </p>
+              <p className="mt-1 font-sans text-sm text-gray-600">
                 For customers placing orders and tracking deliveries.
               </p>
             </div>
 
             <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
-              <p className="text-sm font-bold text-orange-950">Seller</p>
-              <p className="mt-1 text-sm text-orange-900/85">
+              <p className="font-heading text-lg font-medium text-orange-950">
+                Seller
+              </p>
+              <p className="mt-1 font-sans text-sm text-gray-600">
                 For store operators managing catalog, inventory, and POS sales.
               </p>
             </div>
 
             <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
-              <p className="text-sm font-bold text-sky-950">Rider</p>
-              <p className="mt-1 text-sm text-sky-900/85">
+              <p className="font-heading text-lg font-medium text-sky-950">
+                Rider
+              </p>
+              <p className="mt-1 font-sans text-sm text-gray-600">
                 For delivery riders handling dispatch updates and completion.
               </p>
             </div>

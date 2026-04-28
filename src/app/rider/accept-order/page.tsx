@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VirtualizedSimpleBarList } from "@/components/ui/virtualized-simplebar-list";
 import { useRiderAssignmentSocket } from "@/hooks/use-rider-assignment-socket";
 import { useDeliverySocket } from "@/hooks/use-delivery-socket";
 import { orderService } from "@/lib/api/services/order.service";
@@ -16,7 +19,7 @@ import {
   OrderStatusUpdateEvent,
   TrackingUpdatedEvent,
 } from "@/types/delivery";
-import { FALLBACK_LOCATION, hasCoords } from "@/lib/delivery/tracking";
+import { hasCoords } from "@/lib/delivery/tracking";
 
 const ARRIVED_AT_BUYER_THRESHOLD_METERS = 120;
 
@@ -54,6 +57,15 @@ const PICKUP_VERIFICATION_STATUSES: OrderStatus[] = [
   "arrived_at_seller",
 ];
 
+const RECENT_REQUESTS_LIMIT = 150;
+const REQUEST_LIST_HEIGHT_PX = 380;
+const REQUEST_CARD_ESTIMATE_SIZE_PX = 140;
+const REQUEST_CARD_GAP_PX = 12;
+
+type RiderOfferHistoryItem = NewOrderRequestEvent & {
+  receivedAt: string;
+};
+
 const extractCodeFromQr = (rawValue: string) => {
   const value = String(rawValue || "").trim();
   if (!value.includes("|")) {
@@ -67,6 +79,7 @@ const extractCodeFromQr = (rawValue: string) => {
 export default function RiderAcceptOrderPage() {
   const [incomingOrder, setIncomingOrder] =
     useState<NewOrderRequestEvent | null>(null);
+  const [recentOffers, setRecentOffers] = useState<RiderOfferHistoryItem[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [isResponding, setIsResponding] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState("");
@@ -88,12 +101,28 @@ export default function RiderAcceptOrderPage() {
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const scannerRafRef = useRef<number | null>(null);
 
-  const onNewOrderRequest = useCallback((payload: NewOrderRequestEvent) => {
-    setIncomingOrder(payload);
-    setSecondsLeft(payload.expiresInSec || 10);
-    setIsResponding(false);
-    setLatestStatus("incoming order");
+  const pushRecentOffer = useCallback((payload: NewOrderRequestEvent) => {
+    setRecentOffers((prev) => {
+      const nextItem: RiderOfferHistoryItem = {
+        ...payload,
+        receivedAt: new Date().toISOString(),
+      };
+
+      const deduped = prev.filter((item) => item.orderId !== payload.orderId);
+      return [nextItem, ...deduped].slice(0, RECENT_REQUESTS_LIMIT);
+    });
   }, []);
+
+  const onNewOrderRequest = useCallback(
+    (payload: NewOrderRequestEvent) => {
+      setIncomingOrder(payload);
+      pushRecentOffer(payload);
+      setSecondsLeft(payload.expiresInSec || 10);
+      setIsResponding(false);
+      setLatestStatus("incoming order");
+    },
+    [pushRecentOffer],
+  );
 
   const onOrderStatusUpdate = useCallback(
     (payload: OrderStatusUpdateEvent) => {
@@ -264,10 +293,11 @@ export default function RiderAcceptOrderPage() {
     }
 
     setIncomingOrder(offer);
+    pushRecentOffer(offer);
     setSecondsLeft(offer.expiresInSec || 10);
     setIsResponding(false);
     setLatestStatus("incoming order");
-  }, [pendingOfferQuery.data, incomingOrder, activeOrderId]);
+  }, [pendingOfferQuery.data, incomingOrder, activeOrderId, pushRecentOffer]);
 
   const trackedOrder = useMemo(() => {
     const queryOrder = trackingQuery.data?.order || null;
@@ -554,27 +584,31 @@ export default function RiderAcceptOrderPage() {
   }, [incomingOrder, activeOrderId]);
 
   return (
-    <section className="space-y-4 rounded-2xl border bg-card p-6 shadow-sm">
+    <section className="space-y-4 rounded-2xl border border-brand-200 bg-linear-to-br from-brand-50 via-white to-deal-50 p-6 shadow-sm">
       <div>
-        <h1 className="text-2xl font-semibold">Rider Auto Assignment</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="font-heading text-2xl font-semibold text-brand-900 sm:text-3xl">
+          Rider Auto Assignment
+        </h1>
+        <p className="mt-2 font-sans text-base text-gray-700">
           Receive nearby order requests in real time and accept or decline.
         </p>
       </div>
 
-      <div className="rounded-xl border bg-background p-4">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+      <div className="rounded-xl border border-brand-200 bg-background p-4">
+        <p className="font-sans text-xs uppercase tracking-wide text-gray-500">
           Current State
         </p>
-        <p className="mt-1 text-lg font-semibold">{riderState}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 font-heading text-lg font-medium text-brand-900">
+          {riderState}
+        </p>
+        <p className="mt-1 font-sans text-sm text-gray-700">
           Latest status: {toStatusLabel(latestStatus)}
         </p>
         {activeOrderId ? (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="text-xs font-mono text-muted-foreground underline-offset-2 hover:underline"
+              className="font-mono text-xs text-gray-500 underline-offset-2 hover:underline"
               onClick={() => {
                 setIsMapVisible((prev) => !prev);
                 setLiveOrder(null);
@@ -596,8 +630,8 @@ export default function RiderAcceptOrderPage() {
         ) : null}
 
         {activeOrderId ? (
-          <div className="mt-3 space-y-2 rounded-lg border bg-card p-3">
-            <p className="text-xs text-muted-foreground">
+          <div className="mt-3 space-y-2 rounded-lg border border-brand-200 bg-brand-50/60 p-3">
+            <p className="font-sans text-xs text-gray-500">
               Distance to buyer:{" "}
               <span className="font-medium text-foreground">
                 {distanceToBuyerMeters === null
@@ -613,6 +647,7 @@ export default function RiderAcceptOrderPage() {
                 disabled={
                   !canMarkArrivedAtBuyer || isUpdatingRiderStatus !== null
                 }
+                className="bg-brand-600 text-white hover:bg-brand-700"
               >
                 {isUpdatingRiderStatus === "arrived"
                   ? "Updating..."
@@ -624,6 +659,7 @@ export default function RiderAcceptOrderPage() {
                 variant="outline"
                 onClick={() => handleRiderStatusUpdate("completed")}
                 disabled={!canCompleteOrder || isUpdatingRiderStatus !== null}
+                className="border-brand-300 text-brand-800 hover:bg-brand-50"
               >
                 {isUpdatingRiderStatus === "complete"
                   ? "Completing..."
@@ -632,7 +668,7 @@ export default function RiderAcceptOrderPage() {
             </div>
 
             {!canMarkArrivedAtBuyer && canAttemptArrivalStatus ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="font-sans text-xs text-gray-500">
                 Arrived button enables within{" "}
                 {ARRIVED_AT_BUYER_THRESHOLD_METERS}m of buyer location.
               </p>
@@ -642,17 +678,19 @@ export default function RiderAcceptOrderPage() {
       </div>
 
       {activeOrderId && isMapVisible ? (
-        <div className="space-y-3 rounded-xl border bg-background p-3">
+        <div className="space-y-3 rounded-xl border border-brand-200 bg-background p-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Pickup Tracking Map</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="font-heading text-xl font-medium text-brand-900">
+              Pickup Tracking Map
+            </h2>
+            <p className="font-sans text-xs text-gray-500">
               Seller can see this rider movement in real time.
             </p>
           </div>
 
           <TrackingMap {...mapState} />
 
-          <p className="text-xs text-muted-foreground">
+          <p className="font-sans text-xs text-gray-500">
             {showPickupTarget
               ? "Target: Seller pickup location"
               : "Target: Buyer drop-off location"}
@@ -661,10 +699,12 @@ export default function RiderAcceptOrderPage() {
       ) : null}
 
       {activeOrderId && needsPickupVerification ? (
-        <div className="space-y-3 rounded-xl border bg-background p-4">
+        <div className="space-y-3 rounded-xl border border-brand-200 bg-background p-4">
           <div>
-            <h2 className="text-sm font-semibold">Pickup QR Verification</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="font-heading text-xl font-medium text-brand-900">
+              Pickup QR Verification
+            </h2>
+            <p className="font-sans text-sm text-gray-700">
               Ask seller to show QR, then scan it or manually enter the code.
             </p>
           </div>
@@ -675,11 +715,17 @@ export default function RiderAcceptOrderPage() {
               variant="outline"
               onClick={() => setIsScannerOpen(true)}
               disabled={isScannerOpen}
+              className="border-brand-300 text-brand-800 hover:bg-brand-50"
             >
               {isScannerOpen ? "Scanning..." : "Scan Seller QR"}
             </Button>
             {isScannerOpen ? (
-              <Button size="sm" variant="outline" onClick={stopScanner}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={stopScanner}
+                className="border-deal-300 text-deal-700 hover:bg-deal-50"
+              >
                 Stop Scanner
               </Button>
             ) : null}
@@ -704,10 +750,14 @@ export default function RiderAcceptOrderPage() {
             value={pickupCode}
             onChange={(event) => setPickupCode(event.target.value)}
             placeholder="Enter pickup code"
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            className="w-full rounded-md border border-brand-200 bg-background px-3 py-2 font-sans text-sm text-gray-700 placeholder:text-gray-400 focus-visible:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-100"
           />
 
-          <Button onClick={handleConfirmPickup} disabled={isVerifyingPickup}>
+          <Button
+            onClick={handleConfirmPickup}
+            disabled={isVerifyingPickup}
+            className="bg-brand-600 text-white hover:bg-brand-700"
+          >
             {isVerifyingPickup
               ? "Verifying..."
               : "Confirm Pickup and Start Delivery"}
@@ -716,22 +766,22 @@ export default function RiderAcceptOrderPage() {
       ) : null}
 
       {incomingOrder ? (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <div className="rounded-xl border border-deal-300 bg-deal-50 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold">
+              <h2 className="font-heading text-xl font-medium text-brand-900">
                 Incoming Delivery Request
               </h2>
-              <p className="text-xs text-muted-foreground font-mono">
+              <p className="font-mono text-xs text-gray-500">
                 {incomingOrder.orderId}
               </p>
             </div>
-            <p className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">
+            <p className="rounded-md bg-deal-500 px-2 py-1 text-xs font-semibold text-white">
               {secondsLeft}s
             </p>
           </div>
 
-          <div className="mt-3 space-y-1 text-sm">
+          <div className="mt-3 space-y-1 font-sans text-sm text-gray-700">
             <p>Distance: {incomingOrder.distanceKm.toFixed(2)} km</p>
             <p>Total Amount: PHP {incomingOrder.totalAmount.toFixed(2)}</p>
             <p>Items: {incomingOrder.items.length}</p>
@@ -747,6 +797,7 @@ export default function RiderAcceptOrderPage() {
             <Button
               onClick={() => respondToOrder("accept_order")}
               disabled={isResponding || secondsLeft <= 0}
+              className="bg-brand-600 text-white hover:bg-brand-700"
             >
               Accept
             </Button>
@@ -754,16 +805,84 @@ export default function RiderAcceptOrderPage() {
               variant="outline"
               onClick={() => respondToOrder("decline_order")}
               disabled={isResponding || secondsLeft <= 0}
+              className="border-deal-300 text-deal-700 hover:bg-deal-50"
             >
               Decline
             </Button>
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-4 font-sans text-sm text-gray-700">
           Waiting for nearby delivery requests...
         </div>
       )}
+
+      <Card className="border-brand-200 bg-linear-to-b from-white to-brand-50 shadow-sm">
+        <CardHeader className="space-y-2 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="font-heading text-xl font-medium text-brand-900">
+                Recent Delivery Requests
+              </CardTitle>
+              <p className="font-sans text-sm text-gray-700">
+                Virtualized queue for rider offer history and quick scanning.
+              </p>
+            </div>
+            <Badge
+              variant="outline"
+              className="w-fit border-brand-300 bg-white text-brand-700"
+            >
+              {recentOffers.length} requests
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4 pt-0">
+          {!recentOffers.length ? (
+            <p className="rounded-lg border border-slate-200 bg-white px-3 py-4 font-sans text-sm text-gray-600">
+              No recent requests yet.
+            </p>
+          ) : (
+            <VirtualizedSimpleBarList
+              items={recentOffers}
+              height={REQUEST_LIST_HEIGHT_PX}
+              estimateSize={REQUEST_CARD_ESTIMATE_SIZE_PX}
+              gap={REQUEST_CARD_GAP_PX}
+              overscan={6}
+              className="rounded-xl border border-brand-200 bg-brand-50/70"
+              getItemKey={(offer) => `${offer.orderId}-${offer.receivedAt}`}
+              renderItem={(offer) => (
+                <div className="rounded-xl border border-brand-200 bg-white p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-xs text-gray-500">
+                        {offer.orderId}
+                      </p>
+                      <p className="mt-1 font-heading text-base font-medium text-brand-900">
+                        PHP {offer.totalAmount.toFixed(2)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="border-deal-300 bg-deal-100 text-deal-700"
+                    >
+                      {offer.distanceKm.toFixed(2)} km
+                    </Badge>
+                  </div>
+
+                  <div className="mt-2 grid gap-1 font-sans text-xs text-gray-500 sm:grid-cols-2">
+                    <p>Items: {offer.items.length}</p>
+                    <p>
+                      Received:{" "}
+                      {new Date(offer.receivedAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+            />
+          )}
+        </CardContent>
+      </Card>
     </section>
   );
 }

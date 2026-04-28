@@ -139,8 +139,8 @@ export default function AdminDashboardPage() {
 
   if (!hydrated || !isAdmin) {
     return (
-      <section className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-sm text-muted-foreground">
+      <section className="rounded-2xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
+        <p className="font-sans text-sm text-gray-700">
           Checking admin access...
         </p>
       </section>
@@ -149,16 +149,18 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border bg-card p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+      <header className="rounded-2xl border border-brand-200 bg-linear-to-br from-brand-50 via-white to-deal-50 p-6 shadow-sm">
+        <p className="font-sans text-xs font-medium uppercase tracking-wider text-brand-700">
           Admin Dashboard
         </p>
-        <h1 className="mt-1 text-2xl font-bold">Platform Control Center</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="mt-1 font-heading text-2xl font-semibold text-brand-900 sm:text-3xl">
+          Platform Control Center
+        </h1>
+        <p className="mt-2 font-sans text-sm text-gray-700">
           Manage sellers, riders, buyers, and order operations for SukiCart.
         </p>
         {hasAnyLoading ? (
-          <p className="mt-3 text-xs font-medium text-emerald-700">
+          <p className="mt-3 font-sans text-xs font-medium text-deal-700">
             Refreshing data...
           </p>
         ) : null}
@@ -297,50 +299,56 @@ export default function AdminDashboardPage() {
 
       {selectedSeller ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-2xl border border-brand-200 bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h3 className="text-lg font-semibold">Seller details</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="font-heading text-lg font-medium text-brand-900">
+                  Seller details
+                </h3>
+                <p className="font-sans text-sm text-gray-600">
                   {selectedSeller.name} - {selectedSeller.storeName}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedSeller(null)}
-                className="rounded-lg border px-3 py-1 text-sm font-semibold"
+                className="rounded-lg border border-brand-300 px-3 py-1 text-sm font-semibold text-brand-800 hover:bg-brand-50"
               >
                 Close
               </button>
             </div>
 
-            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <dl className="mt-4 grid gap-3 font-sans text-sm text-gray-600 sm:grid-cols-2">
               <div>
-                <dt className="text-muted-foreground">Status</dt>
+                <dt className="font-sans text-xs text-gray-500">Status</dt>
                 <dd className="font-semibold">{selectedSeller.status}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Email</dt>
+                <dt className="font-sans text-xs text-gray-500">Email</dt>
                 <dd className="font-semibold">{selectedSeller.email || "-"}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Phone</dt>
+                <dt className="font-sans text-xs text-gray-500">Phone</dt>
                 <dd className="font-semibold">
                   {selectedSeller.phoneNumber || "-"}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Store Type</dt>
+                <dt className="font-sans text-xs text-gray-500">Store Type</dt>
                 <dd className="font-semibold">{selectedSeller.storeType}</dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-muted-foreground">Market Location</dt>
+                <dt className="font-sans text-xs text-gray-500">
+                  Market Location
+                </dt>
                 <dd className="font-semibold">
                   {selectedSeller.marketLocation || "Not provided"}
                 </dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-muted-foreground">Exact Address</dt>
+                <dt className="font-sans text-xs text-gray-500">
+                  Exact Address
+                </dt>
                 <dd className="font-semibold">
                   {selectedSeller.exactAddress || "Not provided"}
                 </dd>

@@ -16,8 +16,10 @@ export function FeatureCard({
       <div className="inline-flex rounded-xl bg-emerald-100 p-2.5 text-emerald-700">
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="mt-3 text-lg font-bold text-emerald-950">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+      <h3 className="mt-3 font-heading text-lg font-medium text-emerald-950">
+        {title}
+      </h3>
+      <p className="mt-2 font-sans text-sm leading-relaxed text-gray-600">
         {description}
       </p>
     </article>

@@ -49,8 +49,10 @@ export default function Home() {
       <section className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-full max-w-6xl gap-4 md:grid-cols-2">
           <article className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-black text-emerald-950">Buyer</h2>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <h2 className="font-heading text-xl font-medium text-emerald-950 sm:text-2xl">
+              Buyer
+            </h2>
+            <ul className="mt-4 space-y-2 font-sans text-sm text-gray-600">
               <li>Browse products</li>
               <li>Add to cart</li>
               <li>Track delivery</li>
@@ -58,8 +60,10 @@ export default function Home() {
           </article>
 
           <article className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-black text-orange-950">Seller</h2>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <h2 className="font-heading text-xl font-medium text-orange-950 sm:text-2xl">
+              Seller
+            </h2>
+            <ul className="mt-4 space-y-2 font-sans text-sm text-gray-600">
               <li>Register store</li>
               <li>Add products</li>
               <li>Sell via POS + online</li>
@@ -70,7 +74,7 @@ export default function Home() {
 
       <section className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-6xl">
-          <h2 className="text-center text-2xl font-black text-emerald-950 sm:text-3xl">
+          <h2 className="font-heading text-center text-2xl font-medium text-emerald-950 sm:text-3xl">
             Built for local market operations
           </h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -89,40 +93,40 @@ export default function Home() {
       <section className="px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-full max-w-6xl gap-4 lg:grid-cols-2">
           <article className="rounded-3xl border border-orange-100 bg-linear-to-br from-orange-50 to-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-widest text-orange-700">
+            <p className="font-sans text-xs font-medium uppercase tracking-widest text-orange-700">
               For Sellers
             </p>
-            <h2 className="mt-2 text-2xl font-black text-orange-950">
+            <h2 className="mt-2 font-heading text-xl font-medium text-orange-950 sm:text-2xl">
               Para sa mga tindero sa palengke
             </h2>
-            <ul className="mt-4 space-y-2 text-sm text-orange-900/90">
+            <ul className="mt-4 space-y-2 font-sans text-sm text-gray-600">
               <li>Walay manual lista</li>
               <li>Automatic inventory</li>
               <li>Naay online orders</li>
             </ul>
             <Link
               href="/register/seller"
-              className="mt-6 inline-flex rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
+              className="mt-6 inline-flex rounded-2xl bg-orange-500 px-5 py-3 font-sans text-sm font-medium text-white transition hover:bg-orange-600"
             >
               Register as Seller
             </Link>
           </article>
 
           <article className="rounded-3xl border border-emerald-100 bg-linear-to-br from-emerald-50 to-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+            <p className="font-sans text-xs font-medium uppercase tracking-widest text-emerald-700">
               For Buyers
             </p>
-            <h2 className="mt-2 text-2xl font-black text-emerald-950">
+            <h2 className="mt-2 font-heading text-xl font-medium text-emerald-950 sm:text-2xl">
               Fresh goods, diretso sa imong balay
             </h2>
-            <ul className="mt-4 space-y-2 text-sm text-emerald-900/90">
+            <ul className="mt-4 space-y-2 font-sans text-sm text-gray-600">
               <li>No need mo adto sa palengke</li>
               <li>Fast delivery</li>
               <li>Affordable prices</li>
             </ul>
             <Link
               href="/register/buyer"
-              className="mt-6 inline-flex rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+              className="mt-6 inline-flex rounded-2xl bg-emerald-600 px-5 py-3 font-sans text-sm font-medium text-white transition hover:bg-emerald-700"
             >
               Start Shopping
             </Link>
@@ -132,7 +136,7 @@ export default function Home() {
 
       <section className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-6xl">
-          <h2 className="text-center text-2xl font-black text-emerald-950 sm:text-3xl">
+          <h2 className="font-heading text-center text-2xl font-medium text-emerald-950 sm:text-3xl">
             App Preview
           </h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -140,8 +144,10 @@ export default function Home() {
               <div className="inline-flex rounded-lg bg-emerald-100 p-2 text-emerald-700">
                 <HandCoins className="h-4 w-4" />
               </div>
-              <h3 className="mt-3 font-bold text-emerald-950">POS screen</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <h3 className="mt-3 font-heading text-lg font-medium text-emerald-950">
+                POS screen
+              </h3>
+              <p className="mt-2 font-sans text-sm text-gray-600">
                 Seller can process walk-in orders fast.
               </p>
             </article>
@@ -149,10 +155,10 @@ export default function Home() {
               <div className="inline-flex rounded-lg bg-emerald-100 p-2 text-emerald-700">
                 <Truck className="h-4 w-4" />
               </div>
-              <h3 className="mt-3 font-bold text-emerald-950">
+              <h3 className="mt-3 font-heading text-lg font-medium text-emerald-950">
                 Order tracking
               </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 font-sans text-sm text-gray-600">
                 Buyer sees rider updates and status timeline.
               </p>
             </article>
@@ -160,8 +166,10 @@ export default function Home() {
               <div className="inline-flex rounded-lg bg-emerald-100 p-2 text-emerald-700">
                 <Boxes className="h-4 w-4" />
               </div>
-              <h3 className="mt-3 font-bold text-emerald-950">Dashboard</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <h3 className="mt-3 font-heading text-lg font-medium text-emerald-950">
+                Dashboard
+              </h3>
+              <p className="mt-2 font-sans text-sm text-gray-600">
                 Seller tracks stock, sales, and active orders.
               </p>
             </article>

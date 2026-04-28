@@ -63,13 +63,13 @@ export default function RegisterBuyerPage() {
   return (
     <div className="min-h-screen bg-emerald-50 px-4 py-12 sm:px-6 lg:px-8">
       <section className="mx-auto w-full max-w-xl rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+        <p className="font-sans text-xs font-medium uppercase tracking-widest text-emerald-700">
           Buyer Registration
         </p>
-        <h1 className="mt-2 text-3xl font-black text-emerald-950">
+        <h1 className="mt-2 font-heading text-3xl font-semibold text-emerald-950">
           Start Buying
         </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="mt-3 font-sans text-base text-gray-600">
           Fast and simple signup so you can start ordering fresh goods.
         </p>
 
@@ -126,7 +126,7 @@ export default function RegisterBuyerPage() {
             onClick={() =>
               toast.info("Use current location feature coming soon.")
             }
-            className="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-muted"
+            className="inline-flex items-center rounded-xl border px-4 py-2 font-sans text-sm font-medium hover:bg-muted"
           >
             Use current location
           </button>
@@ -174,7 +174,7 @@ export default function RegisterBuyerPage() {
 
         <Link
           href="/"
-          className="mt-6 inline-flex rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-muted"
+          className="mt-6 inline-flex rounded-xl border px-4 py-2 font-sans text-sm font-medium hover:bg-muted"
         >
           Back to Landing Page
         </Link>

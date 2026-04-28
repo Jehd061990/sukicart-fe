@@ -144,10 +144,10 @@ export function StepperForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wider text-orange-700">
+          <p className="font-sans text-xs font-semibold uppercase tracking-wider text-orange-700">
             Step {step + 1} of {STEP_TITLES.length}
           </p>
-          <p className="text-xs text-muted-foreground">{progress}%</p>
+          <p className="font-sans text-xs text-gray-500">{progress}%</p>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-orange-100">
           <div
@@ -155,7 +155,7 @@ export function StepperForm() {
             style={{ width: `${progress}%` }}
           />
         </div>
-        <h2 className="text-xl font-black text-orange-950">
+        <h2 className="font-heading text-xl font-semibold text-orange-950">
           {STEP_TITLES[step]}
         </h2>
       </div>
@@ -228,18 +228,18 @@ export function StepperForm() {
             error={errors.marketLocation}
             placeholder="Carbon Market, Cebu City"
           />
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-foreground">
+          <div className="space-y-2">
+            <label className="font-sans text-sm font-medium text-gray-600">
               Exact Address
             </label>
             <textarea
               {...register("exactAddress")}
               rows={4}
               placeholder="Stall number, street, barangay"
-              className="w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none ring-0 transition focus:border-emerald-500"
+              className="w-full rounded-2xl border border-gray-200 bg-white px-3.5 py-2.5 font-sans text-sm text-gray-700 placeholder:text-gray-400 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:px-4 sm:py-3"
             />
             {errors.exactAddress ? (
-              <p className="text-xs text-destructive">
+              <p className="font-sans text-xs text-destructive">
                 {errors.exactAddress.message}
               </p>
             ) : null}
@@ -293,7 +293,7 @@ export function StepperForm() {
             error={errors.acceptTerms}
           />
           {submitSuccess ? (
-            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 font-sans text-sm font-semibold text-emerald-800">
               Registration successful! Waiting for approval.
             </p>
           ) : null}
@@ -305,7 +305,7 @@ export function StepperForm() {
           type="button"
           onClick={goBack}
           disabled={step === 0 || isSubmitting}
-          className="inline-flex items-center justify-center rounded-2xl border px-5 py-3 text-base font-semibold transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-gray-200 px-4 py-2.5 font-sans text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-muted active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-200 sm:px-5 sm:py-3 sm:text-base disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
         >
           Back
         </button>
@@ -315,7 +315,7 @@ export function StepperForm() {
             type="button"
             onClick={goNext}
             disabled={isSubmitting}
-            className="inline-flex items-center justify-center rounded-2xl bg-orange-500 px-5 py-3 text-base font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-orange-500 px-4 py-2.5 font-sans text-sm font-semibold text-white transition hover:bg-orange-600 active:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 sm:px-5 sm:py-3 sm:text-base disabled:cursor-not-allowed disabled:bg-orange-300 disabled:text-white/90"
           >
             Next
           </button>

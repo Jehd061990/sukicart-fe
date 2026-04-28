@@ -135,19 +135,21 @@ export default function BuyerCheckoutPage() {
 
   return (
     <section className="space-y-4">
-      <Card>
+      <Card className="border-brand-200 bg-linear-to-br from-brand-50 via-white to-deal-50">
         <CardHeader>
-          <CardTitle className="text-2xl">Buyer Checkout (COD)</CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <CardTitle className="font-heading text-2xl font-semibold text-brand-900 sm:text-3xl">
+            Buyer Checkout (COD)
+          </CardTitle>
+          <p className="font-sans text-sm text-gray-700">
             Place your order now and it will appear on seller order management.
           </p>
         </CardHeader>
       </Card>
 
       {createdOrderId ? (
-        <Card>
+        <Card className="border-brand-200">
           <CardContent className="space-y-3 py-5">
-            <p className="text-sm text-muted-foreground">
+            <p className="font-sans text-sm text-gray-700">
               Order placed with ID
             </p>
             <p className="font-mono text-sm font-semibold">{createdOrderId}</p>
@@ -166,13 +168,15 @@ export default function BuyerCheckoutPage() {
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="border-brand-200">
         <CardHeader>
-          <CardTitle className="text-base">Order Items</CardTitle>
+          <CardTitle className="font-heading text-xl font-medium text-brand-900">
+            Order Items
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="font-sans text-sm text-gray-700">
               Your cart is currently empty.
             </p>
           ) : (
@@ -180,11 +184,13 @@ export default function BuyerCheckoutPage() {
               {items.map((item) => (
                 <div
                   key={item.productId}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2"
+                  className="flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2"
                 >
                   <div>
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-heading text-base font-medium text-brand-900">
+                      {item.name}
+                    </p>
+                    <p className="font-sans text-xs text-gray-500">
                       Qty: {item.quantity}
                     </p>
                   </div>
@@ -196,18 +202,20 @@ export default function BuyerCheckoutPage() {
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between border-t pt-3">
-            <span className="text-sm text-muted-foreground">Subtotal</span>
-            <span className="text-lg font-semibold">
+          <div className="mt-4 flex items-center justify-between border-t border-brand-200 pt-3">
+            <span className="font-sans text-sm text-gray-700">Subtotal</span>
+            <span className="font-heading text-lg font-semibold text-brand-900">
               PHP {subtotal.toFixed(2)}
             </span>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-brand-200">
         <CardHeader>
-          <CardTitle className="text-base">Buyer Location (Optional)</CardTitle>
+          <CardTitle className="font-heading text-xl font-medium text-brand-900">
+            Buyer Location (Optional)
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -217,11 +225,12 @@ export default function BuyerCheckoutPage() {
               size="sm"
               onClick={fetchCurrentLocation}
               disabled={isLocating}
+              className="border-brand-300 text-brand-800 hover:bg-brand-50"
             >
               {isLocating ? "Detecting location..." : "Use Current Location"}
             </Button>
             {locationDetected ? (
-              <span className="text-xs text-emerald-600">
+              <span className="rounded-full bg-brand-100 px-2.5 py-1 font-sans text-xs font-medium text-brand-700">
                 Current location added to payload
               </span>
             ) : null}
@@ -244,12 +253,14 @@ export default function BuyerCheckoutPage() {
             <Button
               variant="outline"
               onClick={() => router.push("/buyer/cart")}
+              className="border-brand-300 text-brand-800 hover:bg-brand-50"
             >
               Back to Cart
             </Button>
             <Button
               onClick={handlePlaceOrder}
               disabled={isSubmitting || items.length === 0}
+              className="bg-brand-600 text-white hover:bg-brand-700"
             >
               {isSubmitting ? "Placing Order..." : "Place COD Order"}
             </Button>

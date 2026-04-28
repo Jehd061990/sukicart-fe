@@ -5,7 +5,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VirtualizedSimpleBarList } from "@/components/ui/virtualized-simplebar-list";
 import { useDeliverySocket } from "@/hooks/use-delivery-socket";
 import { orderService } from "@/lib/api/services/order.service";
 import {
@@ -45,6 +48,101 @@ const SELLER_LOCATION_SHARE_STATUSES = new Set<OrderStatus>([
   "arrived_at_buyer",
 ]);
 
+const ORDER_LIST_HEIGHT_PX = 440;
+const ORDER_CARD_ESTIMATE_SIZE_PX = 142;
+const ORDER_CARD_GAP_PX = 12;
+
+const ORDER_STATUS_TONE: Partial<Record<MarketplaceOrder["status"], string>> = {
+  pending: "bg-amber-100 text-amber-800 border-amber-300",
+  searching_rider: "bg-indigo-100 text-indigo-800 border-indigo-300",
+  accepted: "bg-sky-100 text-sky-800 border-sky-300",
+  preparing: "bg-orange-100 text-orange-800 border-orange-300",
+  ready_for_pickup: "bg-violet-100 text-violet-800 border-violet-300",
+  assigned_to_rider: "bg-cyan-100 text-cyan-800 border-cyan-300",
+  arrived_at_seller: "bg-blue-100 text-blue-800 border-blue-300",
+  picked_up: "bg-teal-100 text-teal-800 border-teal-300",
+  out_for_delivery: "bg-lime-100 text-lime-800 border-lime-300",
+  arrived_at_buyer: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  delivered: "bg-green-100 text-green-800 border-green-300",
+  completed: "bg-green-100 text-green-800 border-green-300",
+  cancelled: "bg-rose-100 text-rose-800 border-rose-300",
+  declined: "bg-rose-100 text-rose-800 border-rose-300",
+};
+
+type OrderCardProps = {
+  orderItem: MarketplaceOrder;
+  isTrackable: boolean;
+  onOpenOrder: (order: MarketplaceOrder) => void;
+  onTrackOrder: (orderId: string) => void;
+};
+
+function OrderCard({
+  orderItem,
+  isTrackable,
+  onOpenOrder,
+  onTrackOrder,
+}: OrderCardProps) {
+  return (
+    <Card className="border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300">
+      <CardHeader className="space-y-3 p-4 pb-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-sans text-xs font-medium uppercase tracking-wide text-gray-500">
+              Order ID
+            </p>
+            <p className="truncate font-mono text-xs text-gray-500">
+              {orderItem.id}
+            </p>
+          </div>
+          <Badge
+            variant="outline"
+            className={
+              ORDER_STATUS_TONE[orderItem.status] ||
+              "bg-slate-100 text-slate-700 border-slate-300"
+            }
+          >
+            {orderItem.status.replaceAll("_", " ")}
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="font-sans text-xs text-gray-500">Buyer</p>
+            <p className="truncate font-heading text-base font-medium text-slate-900">
+              {orderItem.buyer?.name || "Buyer"}
+            </p>
+          </div>
+          <div>
+            <p className="font-sans text-xs text-gray-500">Total</p>
+            <p className="font-heading text-base font-medium text-slate-900">
+              PHP {orderItem.total.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="flex flex-wrap gap-2 p-4 pt-1">
+        <Button
+          size="sm"
+          className="flex-1 min-w-32"
+          onClick={() => onOpenOrder(orderItem)}
+        >
+          View Details
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1 min-w-32"
+          onClick={() => onTrackOrder(orderItem.id)}
+          disabled={!isTrackable}
+        >
+          {isTrackable ? "Track Rider" : "Not Trackable"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SellerTrackingPanel() {
   const queryClient = useQueryClient();
   const [activeOrderId, setActiveOrderId] = useState("");
@@ -70,9 +168,21 @@ export function SellerTrackingPanel() {
 
   const sellerOrdersQuery = useQuery({
     queryKey: ["seller-orders", "latest"],
-    queryFn: () => orderService.getMyOrders(20),
+    queryFn: () => orderService.getMyOrders(150),
     refetchInterval: 5000,
   });
+
+  const sellerOrders = sellerOrdersQuery.data || [];
+
+  const handleTrackOrder = (orderId: string) => {
+    setActiveOrderId(orderId);
+    setLiveOrder(null);
+  };
+
+  const handleOpenOrder = (orderItem: MarketplaceOrder) => {
+    setSelectedOrder(orderItem);
+    setPickupQrData(null);
+  };
 
   const onTrackingUpdated = useCallback((payload: TrackingUpdatedEvent) => {
     setLiveOrder(payload);
@@ -364,70 +474,79 @@ export function SellerTrackingPanel() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border bg-card p-4 shadow-sm">
-        <h2 className="text-lg font-semibold">Latest Seller Orders</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Orders placed by buyers appear here and can be tracked instantly.
-        </p>
-
-        {sellerOrdersQuery.isLoading ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Loading seller orders...
-          </p>
-        ) : sellerOrdersQuery.isError ? (
-          <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            Failed to load seller orders. Please refresh and ensure backend is
-            running with latest changes.
-          </p>
-        ) : sellerOrdersQuery.data?.length ? (
-          <div className="mt-3 space-y-2">
-            {sellerOrdersQuery.data.map((orderItem) => (
-              <div
-                key={orderItem.id}
-                className="w-full rounded-lg border px-3 py-2"
+      <Card className="border-slate-200 bg-linear-to-b from-white to-slate-50 shadow-sm">
+        <CardHeader className="space-y-2 p-4 sm:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="font-heading text-xl font-medium text-slate-900 sm:text-2xl">
+                Live Seller Orders
+              </CardTitle>
+              <p className="mt-1 font-sans text-base text-gray-600">
+                Designed for high-volume queues with smooth scrolling and
+                instant actions.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-slate-300 bg-white text-slate-700"
               >
-                <button
-                  type="button"
-                  className="w-full text-left hover:bg-muted"
-                  onClick={() => {
-                    setSelectedOrder(orderItem);
-                    setPickupQrData(null);
-                  }}
-                >
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {orderItem.id}
-                  </p>
-                  <p className="text-sm font-medium">
-                    {orderItem.buyer?.name || "Buyer"} • PHP{" "}
-                    {orderItem.total.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Status: {orderItem.status}
-                  </p>
-                </button>
-
-                {canTrackRider(orderItem.status) ? (
-                  <div className="mt-2 flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setActiveOrderId(orderItem.id);
-                        setLiveOrder(null);
-                      }}
-                    >
-                      Track Rider
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
+                {sellerOrders.length} orders
+              </Badge>
+              <Badge
+                variant="outline"
+                className="border-emerald-300 bg-emerald-50 text-emerald-700"
+              >
+                Auto-refresh 5s
+              </Badge>
+            </div>
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted-foreground">
-            No seller orders found yet.
-          </p>
-        )}
-      </section>
+        </CardHeader>
+
+        <CardContent className="p-4 pt-0 sm:p-5 sm:pt-0">
+          <div className="rounded-xl border border-slate-200 bg-white/90 p-3">
+            <p className="font-sans text-xs font-medium uppercase tracking-wide text-gray-500">
+              Order queue
+            </p>
+            <p className="mt-1 font-sans text-sm text-gray-600">
+              Tap a card to open details, or track active deliveries.
+            </p>
+          </div>
+
+          {sellerOrdersQuery.isLoading ? (
+            <p className="mt-4 font-sans text-sm text-gray-600">
+              Loading seller orders...
+            </p>
+          ) : sellerOrdersQuery.isError ? (
+            <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              Failed to load seller orders. Please refresh and ensure backend is
+              running with latest changes.
+            </p>
+          ) : sellerOrders.length ? (
+            <VirtualizedSimpleBarList
+              items={sellerOrders}
+              height={ORDER_LIST_HEIGHT_PX}
+              estimateSize={ORDER_CARD_ESTIMATE_SIZE_PX}
+              gap={ORDER_CARD_GAP_PX}
+              overscan={6}
+              className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70"
+              getItemKey={(orderItem) => orderItem.id}
+              renderItem={(orderItem) => (
+                <OrderCard
+                  orderItem={orderItem}
+                  isTrackable={canTrackRider(orderItem.status)}
+                  onOpenOrder={handleOpenOrder}
+                  onTrackOrder={handleTrackOrder}
+                />
+              )}
+            />
+          ) : (
+            <p className="mt-4 font-sans text-sm text-gray-600">
+              No seller orders found yet.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="rounded-xl border bg-card p-3 shadow-sm">
@@ -436,23 +555,23 @@ export function SellerTrackingPanel() {
 
         <div className="space-y-4">
           <div className="rounded-xl border bg-card p-4">
-            <h2 className="text-base font-semibold">Status</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <h2 className="font-heading text-xl font-medium">Status</h2>
+            <p className="mt-2 font-sans text-sm text-gray-600">
               Order:{" "}
               <span className="text-foreground">{activeOrderId || "-"}</span>
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 font-sans text-sm text-gray-600">
               Status:{" "}
               <span className="text-foreground">{order?.status || "-"}</span>
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 font-sans text-sm text-gray-600">
               Rider:{" "}
               <span className="text-foreground">
                 {order?.riderId || "Unassigned"}
               </span>
             </p>
 
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 font-sans text-sm text-gray-600">
               Seller Location Sharing:{" "}
               <span
                 className={
@@ -466,7 +585,7 @@ export function SellerTrackingPanel() {
             </p>
 
             {order?.sellerLocation?.updatedAt ? (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 font-sans text-xs text-gray-500">
                 Last shared:{" "}
                 {new Date(order.sellerLocation.updatedAt).toLocaleTimeString()}
               </p>
@@ -498,8 +617,10 @@ export function SellerTrackingPanel() {
           <div className="relative z-2001 w-full max-w-2xl rounded-xl border bg-card p-5 shadow-xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold">Order Details</h3>
-                <p className="font-mono text-xs text-muted-foreground">
+                <h3 className="font-heading text-lg font-medium">
+                  Order Details
+                </h3>
+                <p className="font-mono text-xs text-gray-500">
                   {selectedOrder.id}
                 </p>
               </div>
@@ -508,21 +629,23 @@ export function SellerTrackingPanel() {
               </Button>
             </div>
 
-            <div className="space-y-2 rounded-lg border p-3 text-sm">
+            <div className="space-y-2 rounded-lg border p-3 font-sans text-sm text-gray-600">
               <p>
-                <span className="text-muted-foreground">Buyer:</span>{" "}
+                <span className="font-sans text-xs text-gray-500">Buyer:</span>{" "}
                 {selectedOrder.buyer?.name || "Buyer"}
               </p>
               <p>
-                <span className="text-muted-foreground">Status:</span>{" "}
+                <span className="font-sans text-xs text-gray-500">Status:</span>{" "}
                 {selectedOrder.status}
               </p>
               <p>
-                <span className="text-muted-foreground">Total:</span> PHP{" "}
-                {selectedOrder.total.toFixed(2)}
+                <span className="font-sans text-xs text-gray-500">Total:</span>{" "}
+                PHP {selectedOrder.total.toFixed(2)}
               </p>
               <p>
-                <span className="text-muted-foreground">Created:</span>{" "}
+                <span className="font-sans text-xs text-gray-500">
+                  Created:
+                </span>{" "}
                 {new Date(selectedOrder.createdAt).toLocaleString()}
               </p>
               {statusMismatchDebugInfo ? (
@@ -533,7 +656,7 @@ export function SellerTrackingPanel() {
             </div>
 
             <div className="mt-4">
-              <h4 className="mb-2 text-sm font-semibold">Items</h4>
+              <h4 className="mb-2 font-heading text-lg font-medium">Items</h4>
               <div className="max-h-60 space-y-2 overflow-y-auto">
                 {selectedOrder.items.map((item) => (
                   <div
@@ -544,7 +667,7 @@ export function SellerTrackingPanel() {
                       <p className="font-medium">{item.name}</p>
                       <p>PHP {item.lineTotal.toFixed(2)}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-sans text-xs text-gray-500">
                       Qty {item.quantity} • PHP {item.price.toFixed(2)} /{" "}
                       {item.unit}
                     </p>
@@ -556,7 +679,9 @@ export function SellerTrackingPanel() {
             {canShowPickupQrCompat ? (
               <div className="mt-4 space-y-3 rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-semibold">Pickup QR Handoff</h4>
+                  <h4 className="font-heading text-lg font-medium">
+                    Pickup QR Handoff
+                  </h4>
                   <Button
                     size="sm"
                     variant="outline"
@@ -576,15 +701,13 @@ export function SellerTrackingPanel() {
                         includeMargin
                       />
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <p className="text-muted-foreground">
-                        Rider can scan this QR or manually type this code.
-                      </p>
-                      <p className="font-mono text-base font-semibold">
+                    <div className="space-y-1 font-sans text-sm text-gray-600">
+                      <p>Rider can scan this QR or manually type this code.</p>
+                      <p className="font-mono text-base font-semibold text-slate-900">
                         {pickupQrData.pickupVerificationCode}
                       </p>
                       {pickupQrData.issuedAt ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="font-sans text-xs text-gray-500">
                           Issued:{" "}
                           {new Date(pickupQrData.issuedAt).toLocaleString()}
                         </p>
@@ -592,7 +715,7 @@ export function SellerTrackingPanel() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-sans text-xs text-gray-500">
                     Click Show QR when the rider arrives at your location.
                   </p>
                 )}
@@ -651,14 +774,14 @@ export function SellerTrackingPanel() {
             {showCancelReasonInput && !isReadyOrBeyond ? (
               <div className="mt-4 space-y-2 rounded-lg border p-3">
                 <label
-                  className="text-sm font-medium"
+                  className="font-sans text-sm font-medium text-gray-600"
                   htmlFor="seller-cancel-reason"
                 >
                   Cancellation reason (visible to buyer)
                 </label>
                 <textarea
                   id="seller-cancel-reason"
-                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 font-sans text-sm text-gray-600"
                   placeholder="Please explain why this order is being cancelled"
                   value={cancelReason}
                   onChange={(event) => setCancelReason(event.target.value)}
@@ -686,7 +809,7 @@ export function SellerTrackingPanel() {
             ) : null}
 
             {!canPrepareOrder ? (
-              <p className="mt-3 text-xs text-muted-foreground">
+              <p className="mt-3 font-sans text-xs text-gray-500">
                 {isReadyOrBeyond
                   ? "Order is already ready or in delivery flow."
                   : "This order cannot be moved to preparing from its current status."}
