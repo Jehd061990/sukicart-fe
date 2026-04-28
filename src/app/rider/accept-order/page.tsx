@@ -829,7 +829,7 @@ export default function RiderAcceptOrderPage() {
               </p>
             </div>
             <Badge
-              variant="outline"
+              variant="secondary"
               className="w-fit border-brand-300 bg-white text-brand-700"
             >
               {recentOffers.length} requests
@@ -863,7 +863,7 @@ export default function RiderAcceptOrderPage() {
                       </p>
                     </div>
                     <Badge
-                      variant="outline"
+                      variant="secondary"
                       className="border-deal-300 bg-deal-100 text-deal-700"
                     >
                       {offer.distanceKm.toFixed(2)} km
