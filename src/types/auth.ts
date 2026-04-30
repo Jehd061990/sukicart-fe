@@ -5,6 +5,7 @@ export interface AuthUser {
   name: string;
   email: string;
   username?: string;
+  sellerId?: string | null;
   role: UserRole;
   status?: "active" | "inactive" | "pending";
 }

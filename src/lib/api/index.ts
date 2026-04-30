@@ -7,3 +7,4 @@ export * from "@/lib/api/services/order.service";
 export * from "@/lib/api/services/seller.service";
 export * from "@/lib/api/services/buyer.service";
 export * from "@/lib/api/services/admin.service";
+export * from "@/lib/api/services/inventory.service";

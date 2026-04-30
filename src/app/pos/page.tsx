@@ -22,7 +22,7 @@ export default function POSPage() {
 
   const productsQuery = useQuery({
     queryKey: ["products"],
-    queryFn: () => productService.getAll(),
+    queryFn: () => productService.getMine({ page: 1, limit: 50 }),
   });
 
   const submitMutation = useMutation({
