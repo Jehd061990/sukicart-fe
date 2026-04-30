@@ -51,6 +51,16 @@ export interface CreatePOSPayload {
   autoGeneratePassword?: boolean;
 }
 
+export interface UpdatePOSPayload {
+  posName?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface UpgradePOSSlotsPayload {
+  additionalSlots: number;
+}
+
 export interface CreatePOSResponse {
   message: string;
   pos: POSAccount;
@@ -65,4 +75,14 @@ export interface POSListResponse {
 
 export interface SessionListResponse {
   data: DeviceSession[];
+}
+
+export interface UpgradePOSSlotsResponse {
+  message: string;
+  subscription: {
+    totalSlots: number;
+    loginPolicy: "REJECT" | "INVALIDATE_OLDEST";
+  };
+  usage: POSUsage;
+  note: string;
 }

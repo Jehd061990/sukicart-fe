@@ -11,6 +11,11 @@ export default function SellerPOSPage() {
   const [posName, setPosName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [additionalSlots, setAdditionalSlots] = useState("1");
+  const [editingPosId, setEditingPosId] = useState<string | null>(null);
+  const [editPosName, setEditPosName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
 
   const posListQuery = useQuery({
@@ -68,6 +73,67 @@ export default function SellerPOSPage() {
     onError: () => toast.error("Failed to deactivate POS"),
   });
 
+  const updatePOSMutation = useMutation({
+    mutationFn: (payload: {
+      id: string;
+      posName?: string;
+      username?: string;
+      password?: string;
+    }) => posService.updatePOSAccount(payload.id, payload),
+    onSuccess: () => {
+      toast.success("POS account updated");
+      setEditingPosId(null);
+      setEditPosName("");
+      setEditUsername("");
+      setEditPassword("");
+      posListQuery.refetch();
+    },
+    onError: (error: unknown) => {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof error.response === "object" &&
+        error.response !== null &&
+        "data" in error.response &&
+        typeof error.response.data === "object" &&
+        error.response.data !== null &&
+        "message" in error.response.data
+          ? String(error.response.data.message)
+          : "Failed to update POS account";
+
+      toast.error(message);
+    },
+  });
+
+  const upgradeSlotsMutation = useMutation({
+    mutationFn: () =>
+      posService.upgradePOSSlots({
+        additionalSlots: Number(additionalSlots),
+      }),
+    onSuccess: (result) => {
+      toast.success(result.message);
+      setAdditionalSlots("1");
+      posListQuery.refetch();
+    },
+    onError: (error: unknown) => {
+      const message =
+        typeof error === "object" &&
+        error !== null &&
+        "response" in error &&
+        typeof error.response === "object" &&
+        error.response !== null &&
+        "data" in error.response &&
+        typeof error.response.data === "object" &&
+        error.response.data !== null &&
+        "message" in error.response.data
+          ? String(error.response.data.message)
+          : "Failed to upgrade POS slots";
+
+      toast.error(message);
+    },
+  });
+
   const forceLogoutMutation = useMutation({
     mutationFn: (sessionId: string) => posService.forceLogoutSession(sessionId),
     onSuccess: () => {
@@ -98,6 +164,40 @@ export default function SellerPOSPage() {
     createPOSMutation.mutate();
   };
 
+  const startEdit = (current: { id: string; posName: string; username: string }) => {
+    setEditingPosId(current.id);
+    setEditPosName(current.posName);
+    setEditUsername(current.username);
+    setEditPassword("");
+  };
+
+  const submitEdit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!editingPosId) {
+      return;
+    }
+
+    updatePOSMutation.mutate({
+      id: editingPosId,
+      posName: editPosName.trim() || undefined,
+      username: editUsername.trim() || undefined,
+      password: editPassword.trim() || undefined,
+    });
+  };
+
+  const submitUpgrade = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const parsed = Number(additionalSlots);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      toast.error("Additional slots must be a positive whole number");
+      return;
+    }
+
+    upgradeSlotsMutation.mutate();
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-brand-200 bg-linear-to-br from-brand-50 via-white to-deal-50 p-6 shadow-sm">
@@ -108,6 +208,31 @@ export default function SellerPOSPage() {
           POS Management
         </h1>
         <p className="mt-2 font-sans text-sm text-gray-700">{usageLabel}</p>
+      </section>
+
+      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+        <h2 className="font-heading text-xl font-semibold text-slate-900">
+          Subscription & Additional POS Slots
+        </h2>
+        <p className="mt-2 text-sm text-gray-600">
+          Add more POS slots for new cashier accounts. Current capacity is taken from your POS subscription.
+        </p>
+        <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={submitUpgrade}>
+          <Input
+            type="number"
+            min={1}
+            value={additionalSlots}
+            onChange={(event) => setAdditionalSlots(event.target.value)}
+            placeholder="Additional slots"
+            className="sm:max-w-xs"
+          />
+          <Button type="submit" disabled={upgradeSlotsMutation.isPending}>
+            {upgradeSlotsMutation.isPending ? "Upgrading..." : "Upgrade POS Slots"}
+          </Button>
+        </form>
+        <p className="mt-2 text-xs text-gray-500">
+          Note: this currently simulates successful payment; connect your payment gateway for live billing.
+        </p>
       </section>
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
@@ -165,20 +290,69 @@ export default function SellerPOSPage() {
                   <td className="px-2 py-2">{pos.isDeactivated ? "deactivated" : pos.status}</td>
                   <td className="px-2 py-2">{pos.activeSession?.deviceName || "-"}</td>
                   <td className="px-2 py-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={deactivateMutation.isPending || pos.isDeactivated}
-                      onClick={() => deactivateMutation.mutate(pos.id)}
-                    >
-                      Deactivate
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={updatePOSMutation.isPending}
+                        onClick={() =>
+                          startEdit({
+                            id: pos.id,
+                            posName: pos.posName,
+                            username: pos.username,
+                          })
+                        }
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={deactivateMutation.isPending || pos.isDeactivated}
+                        onClick={() => deactivateMutation.mutate(pos.id)}
+                      >
+                        Deactivate
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {editingPosId ? (
+          <form className="mt-4 grid gap-3 rounded-xl border p-4 md:grid-cols-4" onSubmit={submitEdit}>
+            <Input
+              value={editPosName}
+              onChange={(event) => setEditPosName(event.target.value)}
+              placeholder="POS name"
+            />
+            <Input
+              value={editUsername}
+              onChange={(event) => setEditUsername(event.target.value)}
+              placeholder="Username"
+            />
+            <Input
+              value={editPassword}
+              onChange={(event) => setEditPassword(event.target.value)}
+              placeholder="New password (optional)"
+              type="password"
+            />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={updatePOSMutation.isPending}>
+                {updatePOSMutation.isPending ? "Saving..." : "Save changes"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingPosId(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
       </section>
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">

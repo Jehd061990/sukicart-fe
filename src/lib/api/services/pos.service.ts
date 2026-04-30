@@ -6,6 +6,9 @@ import {
   POSListResponse,
   POSOrderResponse,
   SessionListResponse,
+  UpdatePOSPayload,
+  UpgradePOSSlotsPayload,
+  UpgradePOSSlotsResponse,
 } from "@/types/pos";
 
 export const posService = {
@@ -29,6 +32,19 @@ export const posService = {
 
   deactivatePOSAccount: async (id: string) => {
     const { data } = await apiClient.delete<{ message: string }>(`/pos/${id}`);
+    return data;
+  },
+
+  updatePOSAccount: async (id: string, payload: UpdatePOSPayload) => {
+    const { data } = await apiClient.put<{ message: string }>(`/pos/${id}`, payload);
+    return data;
+  },
+
+  upgradePOSSlots: async (payload: UpgradePOSSlotsPayload) => {
+    const { data } = await apiClient.post<UpgradePOSSlotsResponse>(
+      "/pos/subscription/upgrade",
+      payload,
+    );
     return data;
   },
 
