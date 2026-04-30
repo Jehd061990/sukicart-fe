@@ -14,21 +14,21 @@ import { SubmitButton } from "@/components/forms/submit-button";
 import { z } from "zod";
 
 const loginFormSchema = z.object({
-  email: z
+  identifier: z
     .string()
-    .min(1, "Email is required")
-    .email("Please enter a valid email"),
+    .min(1, "Email or username is required"),
   password: z.string().min(1, "Password is required"),
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-type LoginRole = Extract<UserRole, "ADMIN" | "SELLER" | "BUYER" | "RIDER">;
+type LoginRole = Extract<UserRole, "ADMIN" | "SELLER" | "POS" | "BUYER" | "RIDER">;
 
 const roleLabels: Record<LoginRole, string> = {
   ADMIN: "Admin",
   BUYER: "Buyer",
   SELLER: "Seller",
+  POS: "POS Cashier",
   RIDER: "Rider",
 };
 
@@ -36,6 +36,7 @@ const roleDescriptions: Record<LoginRole, string> = {
   ADMIN: "Manage platform users, orders, and marketplace operations.",
   BUYER: "Browse products, manage cart, and track deliveries.",
   SELLER: "Manage your products, orders, POS, and inventory.",
+  POS: "Operate POS checkout and order dashboard for your assigned counter.",
   RIDER: "View assigned deliveries and update delivery status.",
 };
 
@@ -43,10 +44,27 @@ const roleRedirects: Record<LoginRole, string> = {
   ADMIN: "/admin/dashboard",
   BUYER: "/buyer/home",
   SELLER: "/seller/dashboard",
+  POS: "/pos",
   RIDER: "/rider",
 };
 
-const roles: LoginRole[] = ["ADMIN", "BUYER", "SELLER", "RIDER"];
+const roles: LoginRole[] = ["ADMIN", "BUYER", "SELLER", "POS", "RIDER"];
+
+const getStableDeviceId = () => {
+  if (typeof window === "undefined") {
+    return "server-device";
+  }
+
+  const storageKey = "sukicart-device-id";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const generated = crypto.randomUUID();
+  window.localStorage.setItem(storageKey, generated);
+  return generated;
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -61,7 +79,7 @@ export default function LoginPage() {
     resolver: zodResolver(loginFormSchema),
     mode: "onBlur",
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
     },
   });
@@ -75,12 +93,20 @@ export default function LoginPage() {
       return "Use your authorized admin credentials to manage platform operations.";
     }
 
+    if (selectedRole === "POS") {
+      return "POS users can sign in with username or assigned email plus password.";
+    }
+
     return `Use your registered ${roleLabels[selectedRole].toLowerCase()} account credentials.`;
   }, [selectedRole]);
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
-      const response = await authService.login(values);
+      const response = await authService.login({
+        ...values,
+        deviceId: getStableDeviceId(),
+        deviceName: typeof window !== "undefined" ? window.navigator.userAgent : "Unknown",
+      });
       const returnedRole = response.user.role;
 
       if (returnedRole !== selectedRole) {
@@ -90,7 +116,13 @@ export default function LoginPage() {
         return;
       }
 
-      setAuth(response.accessToken, response.refreshToken, response.user);
+      setAuth(
+        response.accessToken,
+        response.refreshToken,
+        response.user,
+        response.sessionId,
+        response.posUsage || null,
+      );
       toast.success(`${roleLabels[returnedRole]} login successful`);
       router.push(roleRedirects[returnedRole]);
     } catch (error: unknown) {
@@ -155,12 +187,12 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <InputField
-              label="Email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
+              label="Email or Username"
+              name="identifier"
+              type="text"
+              placeholder="you@example.com or cashier.pos"
               register={register}
-              error={errors.email}
+              error={errors.identifier}
               required
               autoFocus
             />
@@ -238,6 +270,15 @@ export default function LoginPage() {
               </p>
               <p className="mt-1 font-sans text-sm text-gray-600">
                 For store operators managing catalog, inventory, and POS sales.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
+              <p className="font-heading text-lg font-medium text-cyan-950">
+                POS Cashier
+              </p>
+              <p className="mt-1 font-sans text-sm text-gray-600">
+                For counter devices processing walk-in orders using assigned POS credentials.
               </p>
             </div>
 

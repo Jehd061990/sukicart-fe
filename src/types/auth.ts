@@ -1,11 +1,17 @@
-export type UserRole = "ADMIN" | "SELLER" | "BUYER" | "RIDER";
+export type UserRole = "ADMIN" | "SELLER" | "POS" | "BUYER" | "RIDER";
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  username?: string;
   role: UserRole;
   status?: "active" | "inactive" | "pending";
+}
+
+export interface POSUsage {
+  active: number;
+  total: number;
 }
 
 export interface AuthResponse {
@@ -14,11 +20,15 @@ export interface AuthResponse {
   refreshToken: string;
   token?: string;
   user: AuthUser;
+  sessionId?: string | null;
+  posUsage?: POSUsage;
 }
 
 export interface LoginPayload {
-  email: string;
+  identifier: string;
   password: string;
+  deviceId: string;
+  deviceName?: string;
 }
 
 export interface RegisterPayload {

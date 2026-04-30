@@ -111,6 +111,12 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
       { label: "Mark Delivered", href: "/rider/mark-delivered", icon: Truck },
     ],
   },
+  {
+    title: "POS Modules",
+    role: "POS",
+    routeBase: "/pos",
+    modules: [{ label: "Order Dashboard", href: "/pos", icon: HandCoins }],
+  },
 ];
 
 const navByRole: Record<UserRole, NavItem[]> = {
@@ -118,6 +124,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
   BUYER: ROLE_MODULES.find((config) => config.role === "BUYER")?.modules || [],
   SELLER:
     ROLE_MODULES.find((config) => config.role === "SELLER")?.modules || [],
+  POS: ROLE_MODULES.find((config) => config.role === "POS")?.modules || [],
   RIDER: ROLE_MODULES.find((config) => config.role === "RIDER")?.modules || [],
 };
 

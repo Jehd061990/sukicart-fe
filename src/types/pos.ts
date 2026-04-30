@@ -17,3 +17,52 @@ export interface POSOrderResponse {
     type: "POS" | "ONLINE";
   };
 }
+
+export interface DeviceSession {
+  id: string;
+  userId: string;
+  role: "SELLER" | "POS" | "ADMIN" | "BUYER" | "RIDER";
+  deviceId: string;
+  deviceName: string;
+  ipAddress: string;
+  lastActiveAt: string;
+  createdAt: string;
+}
+
+export interface POSAccount {
+  id: string;
+  posName: string;
+  username: string;
+  status: "active" | "inactive" | "pending";
+  isDeactivated: boolean;
+  createdAt: string;
+  activeSession: DeviceSession | null;
+}
+
+export interface POSUsage {
+  active: number;
+  total: number;
+}
+
+export interface CreatePOSPayload {
+  posName: string;
+  username?: string;
+  password?: string;
+  autoGeneratePassword?: boolean;
+}
+
+export interface CreatePOSResponse {
+  message: string;
+  pos: POSAccount;
+  generatedPassword?: string;
+  usage: POSUsage;
+}
+
+export interface POSListResponse {
+  usage: POSUsage;
+  data: POSAccount[];
+}
+
+export interface SessionListResponse {
+  data: DeviceSession[];
+}

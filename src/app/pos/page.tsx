@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { POSCart } from "@/components/pos/pos-cart";
@@ -8,10 +9,12 @@ import { POSProductGrid } from "@/components/pos/pos-product-grid";
 import { productService } from "@/lib/api/services/product.service";
 import { posService } from "@/lib/api/services/pos.service";
 import { usePOSCartStore } from "@/store/pos-cart.store";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function POSPage() {
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const role = useAuthStore((state) => state.user?.role);
 
   const addItem = usePOSCartStore((state) => state.addItem);
   const items = usePOSCartStore((state) => state.items);
@@ -59,6 +62,25 @@ export default function POSPage() {
         product.category.toLowerCase().includes(query),
     );
   }, [productsQuery.data?.products, search]);
+
+  if (role !== "POS") {
+    return (
+      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+        <h1 className="font-heading text-2xl font-semibold text-amber-900">
+          POS Access Required
+        </h1>
+        <p className="mt-2 font-sans text-sm text-amber-800">
+          This dashboard is only available to POS cashier accounts.
+        </p>
+        <Link
+          href="/seller/pos"
+          className="mt-4 inline-block rounded-md bg-amber-600 px-3 py-2 font-sans text-sm font-medium text-white hover:bg-amber-700"
+        >
+          Open Seller POS Management
+        </Link>
+      </section>
+    );
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">

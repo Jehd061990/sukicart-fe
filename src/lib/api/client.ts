@@ -74,7 +74,13 @@ apiClient.interceptors.response.use(
 
         useAuthStore
           .getState()
-          .setAuth(data.accessToken, data.refreshToken, data.user);
+          .setAuth(
+            data.accessToken,
+            data.refreshToken,
+            data.user,
+            data.sessionId,
+            data.posUsage || null,
+          );
       })().finally(() => {
         refreshPromise = null;
       });
