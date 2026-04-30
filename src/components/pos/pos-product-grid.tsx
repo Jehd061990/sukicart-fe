@@ -1,7 +1,52 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Product } from "@/types/product";
+
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:5000/api"
+    : "https://sukicart-be.onrender.com/api";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+function resolveProductImageUrl(image?: string) {
+  if (!image) {
+    return null;
+  }
+
+  if (
+    image.startsWith("http://") ||
+    image.startsWith("https://") ||
+    image.startsWith("data:")
+  ) {
+    return image;
+  }
+
+  const normalizedPath = image.startsWith("/") ? image : `/${image}`;
+  return `${API_ORIGIN}${normalizedPath}`;
+}
+
+function ProductImage({ product }: { product: Product }) {
+  const [hasError, setHasError] = useState(false);
+  const imageUrl = resolveProductImageUrl(product.image);
+
+  if (!imageUrl || hasError) {
+    return <div className="mb-3 h-28 rounded-lg bg-muted" />;
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={product.name}
+      className="mb-3 h-28 w-full rounded-lg object-cover"
+      loading="lazy"
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 interface POSProductGridProps {
   products: Product[];
@@ -33,7 +78,7 @@ export function POSProductGrid({
           key={product._id}
           className="rounded-xl border bg-card p-4 shadow-sm"
         >
-          <div className="mb-3 h-28 rounded-lg bg-muted" />
+          <ProductImage product={product} />
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
             {product.category}
           </p>
