@@ -7,6 +7,8 @@ export interface Product {
   name: string;
   price: number;
   stock: number;
+  barcode?: string;
+  expiryDate?: string | null;
   status: ProductStatus;
   unit: ProductUnit;
   category: ProductCategory;
@@ -43,6 +45,8 @@ export interface CreateProductPayload {
   name: string;
   price: number;
   stock: number;
+  barcode?: string;
+  expiryDate?: string | null;
   unit: ProductUnit;
   category: ProductCategory;
   status?: ProductStatus;

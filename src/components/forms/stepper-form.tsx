@@ -13,6 +13,7 @@ import { SubmitButton } from "@/components/forms/submit-button";
 import { sellerService } from "@/lib/api/services/seller.service";
 import { useSellerRegistrationStore } from "@/store/seller-registration.store";
 import {
+  normalizeSellerStoreType,
   sellerRegistrationSchema,
   SellerRegistrationFormValues,
   STORE_TYPE_OPTIONS,
@@ -59,7 +60,7 @@ export function StepperForm() {
       email: draft.email,
       password: draft.password,
       storeName: draft.storeName,
-      storeType: draft.storeType,
+      storeType: normalizeSellerStoreType(draft.storeType),
       marketLocation: draft.marketLocation,
       exactAddress: draft.exactAddress,
       dtiPermit: null,
@@ -81,7 +82,7 @@ export function StepperForm() {
       email: values.email || "",
       password: values.password || "",
       storeName: values.storeName || "",
-      storeType: values.storeType || "Gulay",
+      storeType: normalizeSellerStoreType(values.storeType),
       marketLocation: values.marketLocation || "",
       exactAddress: values.exactAddress || "",
       handleOwnDelivery: Boolean(values.handleOwnDelivery),
@@ -216,10 +217,7 @@ export function StepperForm() {
             register={register}
             error={errors.storeType}
             required
-            options={STORE_TYPE_OPTIONS.map((option) => ({
-              label: option,
-              value: option,
-            }))}
+            options={STORE_TYPE_OPTIONS}
           />
           <InputField
             label="Market Location"

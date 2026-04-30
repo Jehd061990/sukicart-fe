@@ -58,6 +58,11 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
         href: "/seller/inventory",
         icon: ClipboardCheck,
       },
+      {
+        label: "Store Config",
+        href: "/seller/store-config",
+        icon: ShieldCheck,
+      },
     ],
   },
   {

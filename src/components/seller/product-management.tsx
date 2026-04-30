@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { posService } from "@/lib/api/services/pos.service";
 import { productService } from "@/lib/api/services/product.service";
 import {
   CreateProductPayload,
@@ -27,6 +28,8 @@ const INITIAL_FORM: CreateProductPayload = {
   name: "",
   price: 0,
   stock: 0,
+  barcode: "",
+  expiryDate: null,
   unit: "kg",
   category: "vegetables",
   status: "active",
@@ -55,6 +58,15 @@ export function ProductManagement() {
         status: statusFilter,
       }),
   });
+
+  const storeConfigQuery = useQuery({
+    queryKey: ["store-config", "me"],
+    queryFn: () => posService.getStoreConfig(),
+  });
+
+  const expiryTrackingEnabled = Boolean(
+    storeConfigQuery.data?.config?.features?.expiryTracking,
+  );
 
   const createMutation = useMutation({
     mutationFn: productService.create,
@@ -103,6 +115,8 @@ export function ProductManagement() {
       name: product.name,
       price: product.price,
       stock: product.stock,
+      barcode: product.barcode || "",
+      expiryDate: product.expiryDate || null,
       unit: product.unit,
       category: product.category,
       status: product.status,
@@ -131,6 +145,20 @@ export function ProductManagement() {
       {
         header: "Price",
         cell: ({ row }) => `PHP ${row.original.price.toFixed(2)}`,
+      },
+      {
+        header: "Barcode",
+        cell: ({ row }) => row.original.barcode || "-",
+      },
+      {
+        header: "Expiry",
+        cell: ({ row }) => {
+          if (!row.original.expiryDate) {
+            return "-";
+          }
+
+          return new Date(row.original.expiryDate).toLocaleDateString();
+        },
       },
       { header: "Stock", accessorKey: "stock" },
       {
@@ -189,7 +217,7 @@ export function ProductManagement() {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
-          placeholder="Search product"
+          placeholder="Search product or barcode"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -234,13 +262,13 @@ export function ProductManagement() {
           <tbody>
             {productsQuery.isLoading ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={6}>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={8}>
                   Loading products...
                 </td>
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={6}>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={8}>
                   No products found.
                 </td>
               </tr>
@@ -301,6 +329,41 @@ export function ProductManagement() {
                   }))
                 }
               />
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="Barcode (optional)"
+                  value={formValues.barcode || ""}
+                  onChange={(event) =>
+                    setFormValues((state) => ({
+                      ...state,
+                      barcode: event.target.value,
+                    }))
+                  }
+                />
+                <Input
+                  type="date"
+                  required={expiryTrackingEnabled}
+                  value={
+                    formValues.expiryDate
+                      ? String(formValues.expiryDate).slice(0, 10)
+                      : ""
+                  }
+                  onChange={(event) =>
+                    setFormValues((state) => ({
+                      ...state,
+                      expiryDate: event.target.value || null,
+                    }))
+                  }
+                />
+              </div>
+
+              {expiryTrackingEnabled ? (
+                <p className="text-xs text-amber-700">
+                  Expiry tracking is enabled for your store type. Expiry date is
+                  required.
+                </p>
+              ) : null}
 
               <div className="grid grid-cols-2 gap-2">
                 <Input

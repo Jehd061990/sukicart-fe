@@ -1,6 +1,44 @@
 import { z } from "zod";
 
-export const STORE_TYPE_OPTIONS = ["Gulay", "Karne", "Isda", "Mixed"] as const;
+export const STORE_TYPE_VALUES = [
+  "grocery",
+  "pharmacy",
+  "hardware",
+  "convenience",
+  "retail",
+] as const;
+
+export type SellerStoreType = (typeof STORE_TYPE_VALUES)[number];
+
+export const STORE_TYPE_OPTIONS: Array<{ label: string; value: SellerStoreType }> = [
+  { label: "Grocery store", value: "grocery" },
+  { label: "Pharmacy", value: "pharmacy" },
+  { label: "Hardware store", value: "hardware" },
+  { label: "Convenience store", value: "convenience" },
+  { label: "General retail", value: "retail" },
+];
+
+const LEGACY_TO_CANONICAL_STORE_TYPE: Record<string, SellerStoreType> = {
+  gulay: "grocery",
+  karne: "grocery",
+  isda: "grocery",
+  mixed: "retail",
+};
+
+export const normalizeSellerStoreType = (
+  value: unknown,
+): SellerStoreType => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return "grocery";
+  }
+
+  if ((STORE_TYPE_VALUES as readonly string[]).includes(normalized)) {
+    return normalized as SellerStoreType;
+  }
+
+  return LEGACY_TO_CANONICAL_STORE_TYPE[normalized] || "grocery";
+};
 
 export const sellerRegistrationSchema = z
   .object({
@@ -15,7 +53,7 @@ export const sellerRegistrationSchema = z
       .min(1, "Password is required")
       .min(8, "Password must be at least 8 characters"),
     storeName: z.string().min(1, "Store Name is required"),
-    storeType: z.enum(STORE_TYPE_OPTIONS, {
+    storeType: z.enum(STORE_TYPE_VALUES, {
       message: "Store Type is required",
     }),
     marketLocation: z.string().optional(),
@@ -53,7 +91,7 @@ export const sellerRegistrationDraftDefaults: SellerRegistrationDraft = {
   email: "",
   password: "",
   storeName: "",
-  storeType: "Gulay",
+  storeType: "grocery",
   marketLocation: "",
   exactAddress: "",
   handleOwnDelivery: false,

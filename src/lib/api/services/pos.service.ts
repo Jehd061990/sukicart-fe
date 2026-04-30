@@ -10,6 +10,10 @@ import {
   UpgradePOSSlotsPayload,
   UpgradePOSSlotsResponse,
 } from "@/types/pos";
+import {
+  StoreConfigResponse,
+  UpdateStoreConfigPayload,
+} from "@/types/store-config";
 
 export const posService = {
   createOrder: async (payload: CreatePOSOrderPayload) => {
@@ -55,6 +59,19 @@ export const posService = {
 
   forceLogoutSession: async (id: string) => {
     const { data } = await apiClient.delete<{ message: string }>(`/sessions/${id}`);
+    return data;
+  },
+
+  getStoreConfig: async () => {
+    const { data } = await apiClient.get<StoreConfigResponse>("/store-config/me");
+    return data;
+  },
+
+  updateStoreConfig: async (payload: UpdateStoreConfigPayload) => {
+    const { data } = await apiClient.patch<StoreConfigResponse>(
+      "/store-config/me",
+      payload,
+    );
     return data;
   },
 };

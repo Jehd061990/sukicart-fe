@@ -13,6 +13,8 @@ import { useAuthStore } from "@/store/auth.store";
 
 export default function POSPage() {
   const [search, setSearch] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [prescriptionCode, setPrescriptionCode] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const role = useAuthStore((state) => state.user?.role);
 
@@ -25,6 +27,19 @@ export default function POSPage() {
     queryFn: () => productService.getMine({ page: 1, limit: 50 }),
   });
 
+  const storeConfigQuery = useQuery({
+    queryKey: ["store-config", "me"],
+    queryFn: () => posService.getStoreConfig(),
+    enabled: role === "POS",
+  });
+
+  const storeConfig = storeConfigQuery.data?.config;
+  const barcodeEnabled = Boolean(storeConfig?.features?.barcodeScanning);
+  const prescriptionRequired = Boolean(
+    storeConfig?.features?.prescriptionRequired,
+  );
+  const bulkActionsEnabled = Boolean(storeConfig?.features?.bulkQuantityInput);
+
   const submitMutation = useMutation({
     mutationFn: () =>
       posService.createOrder({
@@ -33,9 +48,13 @@ export default function POSPage() {
           productId: item.productId,
           quantity: item.quantity,
         })),
+        prescriptionCode: prescriptionRequired ? prescriptionCode.trim() : "",
+        scannedCode: barcodeEnabled ? barcodeInput.trim() : "",
       }),
     onSuccess: (result) => {
       clearCart();
+      setPrescriptionCode("");
+      setBarcodeInput("");
       setFeedback(`Order created: ${result.order._id}`);
       productsQuery.refetch();
     },
@@ -51,17 +70,22 @@ export default function POSPage() {
   const products = useMemo(() => {
     const allProducts = productsQuery.data?.products || [];
     const query = search.trim().toLowerCase();
+    const scanned = barcodeInput.trim().toLowerCase();
 
-    if (!query) {
+    if (!query && !scanned) {
       return allProducts;
     }
 
     return allProducts.filter(
       (product) =>
         product.name.toLowerCase().includes(query) ||
-        product.category.toLowerCase().includes(query),
+        product.category.toLowerCase().includes(query) ||
+        product._id.toLowerCase().includes(scanned) ||
+        String(product.barcode || "")
+          .toLowerCase()
+          .includes(scanned),
     );
-  }, [productsQuery.data?.products, search]);
+  }, [productsQuery.data?.products, search, barcodeInput]);
 
   if (role !== "POS") {
     return (
@@ -95,12 +119,60 @@ export default function POSPage() {
           <p className="font-sans text-sm text-gray-700">
             Search products and build a walk-in customer order.
           </p>
+          {storeConfig ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {storeConfig.modules.map((moduleName) => (
+                <span
+                  key={moduleName}
+                  className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-brand-200"
+                >
+                  {moduleName}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <Input
             className="mt-3 border-brand-200 focus-visible:border-brand-500 focus-visible:ring-brand-100"
             placeholder="Search by product name or category"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {barcodeEnabled ? (
+            <Input
+              className="mt-2 border-brand-200 focus-visible:border-brand-500 focus-visible:ring-brand-100"
+              placeholder="Scan barcode or paste product code"
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") {
+                  return;
+                }
+
+                const normalized = barcodeInput.trim().toLowerCase();
+                if (!normalized) {
+                  return;
+                }
+
+                const matched = (productsQuery.data?.products || []).find(
+                  (product) =>
+                    String(product.barcode || "").toLowerCase() === normalized,
+                );
+
+                if (matched && matched.stock > 0) {
+                  addItem(matched);
+                  setBarcodeInput("");
+                }
+              }}
+            />
+          ) : null}
+          {prescriptionRequired ? (
+            <Input
+              className="mt-2 border-brand-200 focus-visible:border-brand-500 focus-visible:ring-brand-100"
+              placeholder="Prescription code (required)"
+              value={prescriptionCode}
+              onChange={(e) => setPrescriptionCode(e.target.value)}
+            />
+          ) : null}
         </div>
 
         <POSProductGrid
@@ -117,6 +189,9 @@ export default function POSPage() {
           </div>
         ) : null}
         <POSCart
+          prescriptionRequired={prescriptionRequired}
+          prescriptionCode={prescriptionCode}
+          enableBulkActions={bulkActionsEnabled}
           onSubmit={() => submitMutation.mutate()}
           isSubmitting={submitMutation.isPending}
         />

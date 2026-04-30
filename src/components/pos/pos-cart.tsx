@@ -8,9 +8,18 @@ import { usePOSCartStore } from "@/store/pos-cart.store";
 interface POSCartProps {
   onSubmit: () => void;
   isSubmitting?: boolean;
+  prescriptionRequired?: boolean;
+  prescriptionCode?: string;
+  enableBulkActions?: boolean;
 }
 
-export function POSCart({ onSubmit, isSubmitting }: POSCartProps) {
+export function POSCart({
+  onSubmit,
+  isSubmitting,
+  prescriptionRequired,
+  prescriptionCode,
+  enableBulkActions,
+}: POSCartProps) {
   const items = usePOSCartStore((state) => state.items);
   const setQuantity = usePOSCartStore((state) => state.setQuantity);
   const removeItem = usePOSCartStore((state) => state.removeItem);
@@ -60,6 +69,7 @@ export function POSCart({ onSubmit, isSubmitting }: POSCartProps) {
                   value={item.quantity}
                   unit={item.unit}
                   max={item.maxStock}
+                  enableBulkActions={enableBulkActions}
                   onChange={(value) => setQuantity(item.productId, value)}
                 />
                 <p className="font-semibold">
@@ -72,6 +82,18 @@ export function POSCart({ onSubmit, isSubmitting }: POSCartProps) {
       </div>
 
       <div className="mt-4 border-t pt-4">
+        {prescriptionRequired ? (
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <p className="font-medium">Prescription code required</p>
+            <p className="mt-1">
+              Enter the code in the POS header input before submitting the order.
+            </p>
+            <p className="mt-1 font-medium">
+              Current value: {prescriptionCode?.trim() || "(empty)"}
+            </p>
+          </div>
+        ) : null}
+
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">Total</p>
           <p className="text-xl font-semibold">${total.toFixed(2)}</p>
@@ -79,7 +101,11 @@ export function POSCart({ onSubmit, isSubmitting }: POSCartProps) {
 
         <Button
           className="w-full"
-          disabled={items.length === 0 || isSubmitting}
+          disabled={
+            items.length === 0 ||
+            isSubmitting ||
+            (prescriptionRequired && !String(prescriptionCode || "").trim())
+          }
           onClick={onSubmit}
         >
           {isSubmitting ? "Submitting..." : "Submit POS Order"}

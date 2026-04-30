@@ -6,6 +6,8 @@ export interface POSOrderItemPayload {
 export interface CreatePOSOrderPayload {
   items: POSOrderItemPayload[];
   paymentMethod: "cash";
+  prescriptionCode?: string;
+  scannedCode?: string;
 }
 
 export interface POSOrderResponse {

@@ -7,6 +7,7 @@ interface QuantityInputProps {
   onChange: (value: number) => void;
   unit: "kg" | "pcs";
   max?: number;
+  enableBulkActions?: boolean;
 }
 
 export function QuantityInput({
@@ -14,11 +15,18 @@ export function QuantityInput({
   onChange,
   unit,
   max,
+  enableBulkActions,
 }: QuantityInputProps) {
   const step = unit === "kg" ? 0.25 : 1;
+  const bulkStep = unit === "kg" ? 2.5 : 10;
 
   const onIncrement = () => {
     const next = Number((value + step).toFixed(2));
+    onChange(max ? Math.min(next, max) : next);
+  };
+
+  const onBulkIncrement = () => {
+    const next = Number((value + bulkStep).toFixed(2));
     onChange(max ? Math.min(next, max) : next);
   };
 
@@ -29,6 +37,11 @@ export function QuantityInput({
 
   return (
     <div className="inline-flex items-center gap-2">
+      {enableBulkActions ? (
+        <Button variant="outline" size="sm" onClick={onBulkIncrement}>
+          +{bulkStep}
+        </Button>
+      ) : null}
       <Button variant="outline" size="sm" onClick={onDecrement}>
         -
       </Button>
