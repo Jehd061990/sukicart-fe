@@ -5,7 +5,29 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { posService } from "@/lib/api/services/pos.service";
-import { StoreType } from "@/types/store-config";
+import { ScannerMode, StoreType } from "@/types/store-config";
+
+const SCANNER_MODES: ScannerMode[] = ["hardware", "camera", "manual"];
+
+const ensureValidScannerMode = (
+  selectedModes: ScannerMode[],
+  defaultMode: ScannerMode,
+) => {
+  const deduped = Array.from(new Set(selectedModes));
+  const safeModes = deduped.length > 0 ? deduped : ["manual"];
+
+  if (safeModes.includes(defaultMode)) {
+    return {
+      modes: safeModes,
+      defaultMode,
+    };
+  }
+
+  return {
+    modes: safeModes,
+    defaultMode: safeModes[0],
+  };
+};
 
 const STORE_TYPE_LABELS: Record<StoreType, string> = {
   grocery: "Grocery Store",
@@ -23,6 +45,8 @@ export default function SellerStoreConfigPage() {
     prescriptionRequired: boolean;
     bulkQuantityInput: boolean;
     maxLineItems: number;
+    scannerModes: ScannerMode[];
+    defaultScannerMode: ScannerMode;
   } | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -46,14 +70,23 @@ export default function SellerStoreConfigPage() {
       prescriptionRequired: Boolean(config.features.prescriptionRequired),
       bulkQuantityInput: Boolean(config.features.bulkQuantityInput),
       maxLineItems: Number(config.businessRules.maxLineItems || 200),
+      scannerModes: Array.isArray(config.uiBehavior.scannerModes)
+        ? config.uiBehavior.scannerModes
+        : ["manual"],
+      defaultScannerMode: config.uiBehavior.defaultScannerMode || "manual",
     };
   }, [storeConfigQuery.data]);
 
   const form = draft || baseForm;
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      posService.updateStoreConfig({
+    mutationFn: () => {
+      const scanner = ensureValidScannerMode(
+        form?.scannerModes || ["manual"],
+        form?.defaultScannerMode || "manual",
+      );
+
+      return posService.updateStoreConfig({
         storeType: form?.storeType,
         configOverrides: {
           features: {
@@ -66,8 +99,16 @@ export default function SellerStoreConfigPage() {
             maxLineItems: Number(form?.maxLineItems || 200),
             paymentMethods: ["cash"],
           },
+          uiBehavior: {
+            showPrescriptionInput: Boolean(form?.prescriptionRequired),
+            showBarcodeScanner: Boolean(form?.barcodeScanning),
+            showBulkQuantityActions: Boolean(form?.bulkQuantityInput),
+            scannerModes: scanner.modes,
+            defaultScannerMode: scanner.defaultMode,
+          },
         },
-      }),
+      });
+    },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["store-config", "me"] }),
@@ -112,6 +153,18 @@ export default function SellerStoreConfigPage() {
     setDraft({
       ...form,
       ...next,
+    });
+  };
+
+  const toggleScannerMode = (mode: ScannerMode, checked: boolean) => {
+    const nextModes = checked
+      ? [...form.scannerModes, mode]
+      : form.scannerModes.filter((item) => item !== mode);
+
+    const scanner = ensureValidScannerMode(nextModes, form.defaultScannerMode);
+    updateDraft({
+      scannerModes: scanner.modes,
+      defaultScannerMode: scanner.defaultMode,
     });
   };
 
@@ -232,6 +285,46 @@ export default function SellerStoreConfigPage() {
             </span>
           ))}
         </div>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Scanner Modes</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Choose which scanner modes are available on POS and which mode opens first.
+        </p>
+
+        <div className="space-y-2 text-sm">
+          {SCANNER_MODES.map((mode) => (
+            <label
+              key={mode}
+              className="flex items-center justify-between gap-3 rounded-md border p-2"
+            >
+              <span className="capitalize">{mode} mode</span>
+              <input
+                type="checkbox"
+                checked={form.scannerModes.includes(mode)}
+                onChange={(event) => toggleScannerMode(mode, event.target.checked)}
+              />
+            </label>
+          ))}
+        </div>
+
+        <label className="mt-4 mb-2 block text-sm font-medium">Default scanner mode</label>
+        <select
+          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          value={form.defaultScannerMode}
+          onChange={(event) =>
+            updateDraft({
+              defaultScannerMode: event.target.value as ScannerMode,
+            })
+          }
+        >
+          {form.scannerModes.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </option>
+          ))}
+        </select>
       </article>
 
       <Button

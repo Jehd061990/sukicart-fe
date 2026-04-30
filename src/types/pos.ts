@@ -3,6 +3,15 @@ export interface POSOrderItemPayload {
   quantity: number;
 }
 
+export interface DecodeBarcodeFramePayload {
+  imageData: string;
+}
+
+export interface DecodeBarcodeFrameResponse {
+  message: string;
+  barcode: string | null;
+}
+
 export interface CreatePOSOrderPayload {
   items: POSOrderItemPayload[];
   paymentMethod: "cash";

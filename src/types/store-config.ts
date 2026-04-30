@@ -5,6 +5,8 @@ export type StoreType =
   | "convenience"
   | "retail";
 
+export type ScannerMode = "camera" | "hardware" | "manual";
+
 export interface StoreConfigFeatures {
   barcodeScanning: boolean;
   expiryTracking: boolean;
@@ -16,6 +18,8 @@ export interface StoreConfigUIBehavior {
   showPrescriptionInput: boolean;
   showBarcodeScanner: boolean;
   showBulkQuantityActions: boolean;
+  scannerModes: ScannerMode[];
+  defaultScannerMode: ScannerMode;
 }
 
 export interface StoreConfigBusinessRules {

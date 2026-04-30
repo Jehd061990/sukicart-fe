@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api/client";
 import {
+  DecodeBarcodeFramePayload,
+  DecodeBarcodeFrameResponse,
   CreatePOSOrderPayload,
   CreatePOSPayload,
   CreatePOSResponse,
@@ -19,6 +21,14 @@ export const posService = {
   createOrder: async (payload: CreatePOSOrderPayload) => {
     const { data } = await apiClient.post<POSOrderResponse>(
       "/pos/orders",
+      payload,
+    );
+    return data;
+  },
+
+  decodeBarcodeFrame: async (payload: DecodeBarcodeFramePayload) => {
+    const { data } = await apiClient.post<DecodeBarcodeFrameResponse>(
+      "/pos/decode-frame",
       payload,
     );
     return data;
