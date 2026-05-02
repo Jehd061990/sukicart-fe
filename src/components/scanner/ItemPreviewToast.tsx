@@ -22,6 +22,7 @@ export function ItemPreviewToast({ items }: ItemPreviewToastProps) {
         >
           <div className="h-12 w-12 overflow-hidden rounded-xl bg-slate-100">
             {item.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={item.image}
                 alt={item.name}

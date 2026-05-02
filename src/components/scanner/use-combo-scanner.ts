@@ -1,45 +1,67 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useScannerStore } from "@/store/scanner.store";
 
 export const useComboScanner = () => {
-  const comboCount = useScannerStore((state) => state.comboCount);
+  const registerSuccess = useScannerStore((state) => state.registerSuccess);
+  const registerFailure = useScannerStore((state) => state.registerFailure);
   const lastComboAt = useScannerStore((state) => state.lastComboAt);
   const resetCombo = useScannerStore((state) => state.resetCombo);
 
   const [visibleCombo, setVisibleCombo] = useState(0);
+  const hideTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (comboCount >= 2) {
-      setVisibleCombo(comboCount);
-      const timer = window.setTimeout(() => {
+  const onScanSuccess = useCallback(
+    (scannedValue: string, now = Date.now()) => {
+      const nextCombo = registerSuccess(scannedValue, now);
+      if (nextCombo < 2) {
+        return nextCombo;
+      }
+
+      setVisibleCombo(nextCombo);
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+      }
+
+      hideTimerRef.current = window.setTimeout(() => {
         setVisibleCombo(0);
+        hideTimerRef.current = null;
       }, 1300);
 
-      return () => {
-        window.clearTimeout(timer);
-      };
-    }
+      return nextCombo;
+    },
+    [registerSuccess],
+  );
 
-    return undefined;
-  }, [comboCount]);
+  const onScanFailure = useCallback(() => {
+    registerFailure();
+    setVisibleCombo(0);
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, [registerFailure]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      if (!lastComboAt || comboCount <= 0) {
+      if (!lastComboAt) {
         return;
       }
 
       if (Date.now() - lastComboAt > 3000) {
         resetCombo();
+        setVisibleCombo(0);
       }
     }, 300);
 
     return () => {
       window.clearInterval(interval);
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+      }
     };
-  }, [comboCount, lastComboAt, resetCombo]);
+  }, [lastComboAt, resetCombo]);
 
   const intensityClass = useMemo(() => {
     if (visibleCombo >= 6) {
@@ -54,8 +76,9 @@ export const useComboScanner = () => {
   }, [visibleCombo]);
 
   return {
-    comboCount,
     visibleCombo,
     intensityClass,
+    onScanSuccess,
+    onScanFailure,
   };
 };

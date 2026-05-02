@@ -89,8 +89,6 @@ export default function ScannerPage() {
   const addItem = usePOSCartStore((state) => state.addItem);
 
   const canProcessScan = useScannerStore((state) => state.canProcessScan);
-  const registerSuccess = useScannerStore((state) => state.registerSuccess);
-  const registerFailure = useScannerStore((state) => state.registerFailure);
 
   const [manualCode, setManualCode] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
@@ -99,7 +97,8 @@ export default function ScannerPage() {
   const [toasts, setToasts] = useState<ScanToastItem[]>([]);
   const [addOneEntries, setAddOneEntries] = useState<FloatingAddOneEntry[]>([]);
 
-  const { visibleCombo, intensityClass } = useComboScanner();
+  const { visibleCombo, intensityClass, onScanSuccess, onScanFailure } =
+    useComboScanner();
 
   const productsQuery = useQuery({
     queryKey: ["products", "scanner"],
@@ -178,14 +177,14 @@ export default function ScannerPage() {
       });
 
       if (!matched) {
-        registerFailure();
+        onScanFailure();
         setFeedback("No matching item found");
         setFeedbackTone("error");
         return;
       }
 
       addItem(matched);
-      registerSuccess(normalized, now);
+      onScanSuccess(normalized, now);
 
       if (navigator.vibrate) {
         navigator.vibrate(100);
@@ -209,7 +208,16 @@ export default function ScannerPage() {
         setFeedbackTone("idle");
       }, 900);
     },
-    [addItem, canProcessScan, playSuccessBeep, popAddOne, products, pushToast, registerFailure, registerSuccess],
+    [
+      addItem,
+      canProcessScan,
+      onScanFailure,
+      onScanSuccess,
+      playSuccessBeep,
+      popAddOne,
+      products,
+      pushToast,
+    ],
   );
 
   const {
@@ -225,7 +233,7 @@ export default function ScannerPage() {
   });
 
   useEffect(() => {
-    if (!hydrated || isMobile === null) {
+    if (!hydrated) {
       return;
     }
 
@@ -242,7 +250,7 @@ export default function ScannerPage() {
     void start();
   }, [hydrated, isMobile, role, router, start]);
 
-  if (!hydrated || isMobile === null || !isMobile) {
+  if (!hydrated || !isMobile) {
     return null;
   }
 
