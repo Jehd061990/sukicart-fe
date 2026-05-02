@@ -32,6 +32,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const stockMeta = getStockMeta(product.stock);
+  const isExternalImage = /^https?:\/\//i.test(product.image ?? "");
 
   const handleAddToCart = async () => {
     if (product.stock <= 0 || isAdding) {
@@ -56,13 +57,22 @@ export function ProductCard({
       >
         <div className="h-36 w-full overflow-hidden bg-muted">
           {product.image ? (
-            <Image
-              src={product.image}
-              alt={product.name}
-              width={512}
-              height={288}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
+            isExternalImage ? (
+              <img
+                src={product.image}
+                alt={product.name}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+            ) : (
+              <Image
+                src={product.image}
+                alt={product.name}
+                width={512}
+                height={288}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            )
           ) : (
             <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
               No image

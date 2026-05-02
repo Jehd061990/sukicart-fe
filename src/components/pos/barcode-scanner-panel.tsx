@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { QuaggaJSCodeReader } from "@ericblade/quagga2";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScannerMode } from "@/types/store-config";
@@ -127,19 +128,7 @@ export function BarcodeScannerPanel({
   const lastScanRef = useRef<{ value: string; at: number } | null>(null);
   const lastCameraErrorAtRef = useRef<number>(0);
   const cameraRegionRef = useRef<HTMLDivElement | null>(null);
-  const quaggaRef = useRef<{
-    default: {
-      init: (config: unknown, cb: (err?: unknown) => void) => void;
-      start: () => void;
-      stop: () => void;
-      decodeSingle: (
-        config: unknown,
-        cb: (result?: { codeResult?: { code?: string } }) => void,
-      ) => void;
-      offDetected: (handler: (result: unknown) => void) => void;
-      onDetected: (handler: (result: unknown) => void) => void;
-    };
-  } | null>(null);
+  const quaggaRef = useRef<typeof import("@ericblade/quagga2") | null>(null);
   const detectedHandlerRef = useRef<((result: unknown) => void) | null>(null);
   const isStartingRef = useRef(false);
   const fallbackTimerRef = useRef<number | null>(null);
@@ -224,7 +213,11 @@ export function BarcodeScannerPanel({
           return "";
         }
 
-        const runDecode = async (src: string, readers: string[], locate: boolean) =>
+        const runDecode = async (
+          src: string,
+          readers: QuaggaJSCodeReader[],
+          locate: boolean,
+        ) =>
           new Promise<string>((resolve) => {
             quagga.decodeSingle(
               {
@@ -284,7 +277,11 @@ export function BarcodeScannerPanel({
         const mirrorCanvas = makeMirrored();
         const mirrorSrc = mirrorCanvas?.toDataURL("image/jpeg", 0.94) || "";
 
-        const passes: Array<{ src: string; readers: string[]; locate: boolean }> = [
+        const passes: Array<{
+          src: string;
+          readers: QuaggaJSCodeReader[];
+          locate: boolean;
+        }> = [
           {
             src: fullSrc,
             readers: ["ean_reader", "upc_reader", "upc_e_reader", "ean_8_reader"],

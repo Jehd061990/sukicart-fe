@@ -83,6 +83,9 @@ export function StorefrontGrid() {
     () => Array.from({ length: 8 }, (_, index) => ({ id: index })),
     [],
   );
+  const isSelectedImageExternal = /^https?:\/\//i.test(
+    selectedProduct?.image ?? "",
+  );
 
   return (
     <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
@@ -188,13 +191,22 @@ export function StorefrontGrid() {
             <CardContent className="space-y-4">
               <div className="h-64 overflow-hidden rounded-lg border bg-muted">
                 {selectedProduct.image ? (
-                  <Image
-                    src={selectedProduct.image}
-                    alt={selectedProduct.name}
-                    width={1024}
-                    height={640}
-                    className="h-full w-full object-cover"
-                  />
+                  isSelectedImageExternal ? (
+                    <img
+                      src={selectedProduct.image}
+                      alt={selectedProduct.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Image
+                      src={selectedProduct.image}
+                      alt={selectedProduct.name}
+                      width={1024}
+                      height={640}
+                      className="h-full w-full object-cover"
+                    />
+                  )
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
                     No image available
