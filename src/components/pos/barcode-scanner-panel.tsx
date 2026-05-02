@@ -627,7 +627,7 @@ export function BarcodeScannerPanel({
             }}
             className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
               selectedMode === mode
-                ? "bg-brand-600 text-white"
+                ? "bg-brand-600 text-brand-50 hover:bg-brand-700"
                 : "bg-brand-100 text-brand-700 hover:bg-brand-200"
             }`}
           >

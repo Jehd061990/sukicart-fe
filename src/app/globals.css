@@ -9,9 +9,29 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-brand: var(--brand);
+  --color-brand-50: var(--brand-green-50);
+  --color-brand-100: var(--brand-green-100);
+  --color-brand-200: var(--brand-green-200);
+  --color-brand-300: var(--brand-green-300);
+  --color-brand-400: var(--brand-green-400);
+  --color-brand-500: var(--brand-green-500);
+  --color-brand-600: var(--brand-green-600);
+  --color-brand-700: var(--brand-green-700);
+  --color-brand-800: var(--brand-green-800);
+  --color-brand-900: var(--brand-green-900);
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-muted: var(--brand-muted);
   --color-deal: var(--deal);
+  --color-deal-50: var(--brand-orange-50);
+  --color-deal-100: var(--brand-orange-100);
+  --color-deal-200: var(--brand-orange-200);
+  --color-deal-300: var(--brand-orange-300);
+  --color-deal-400: var(--brand-orange-400);
+  --color-deal-500: var(--brand-orange-500);
+  --color-deal-600: var(--brand-orange-600);
+  --color-deal-700: var(--brand-orange-700);
+  --color-deal-800: var(--brand-orange-800);
+  --color-deal-900: var(--brand-orange-900);
   --color-deal-foreground: var(--deal-foreground);
   --color-deal-muted: var(--deal-muted);
   --font-sans: var(--font-inter);
@@ -159,6 +179,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
   }
   body {
     @apply bg-background text-foreground font-sans;
