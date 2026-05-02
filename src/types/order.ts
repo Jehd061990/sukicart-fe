@@ -39,6 +39,8 @@ export interface MarketplaceOrderItem {
   price: number;
   quantity: number;
   lineTotal: number;
+  variant?: string;
+  note?: string;
 }
 
 export interface MarketplaceOrderParty {

@@ -660,7 +660,7 @@ export function SellerTrackingPanel() {
               <div className="max-h-60 space-y-2 overflow-y-auto">
                 {selectedOrder.items.map((item) => (
                   <div
-                    key={`${selectedOrder.id}-${item.productId}`}
+                    key={`${selectedOrder.id}-${item.productId}-${item.variant || "regular"}-${item.note || ""}`}
                     className="rounded-lg border px-3 py-2 text-sm"
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -671,6 +671,14 @@ export function SellerTrackingPanel() {
                       Qty {item.quantity} • PHP {item.price.toFixed(2)} /{" "}
                       {item.unit}
                     </p>
+                    <p className="font-sans text-xs text-gray-500">
+                      Variant: {item.variant || "Regular"}
+                    </p>
+                    {item.note ? (
+                      <p className="font-sans text-xs text-gray-500">
+                        Note: {item.note}
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>

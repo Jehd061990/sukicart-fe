@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuthStore } from "@/store/auth.store";
 import { NewOrderRequestEvent, OrderStatusUpdateEvent } from "@/types/delivery";
@@ -15,12 +15,25 @@ interface UseRiderAssignmentSocketOptions {
   onOrderStatusUpdate?: (payload: OrderStatusUpdateEvent) => void;
 }
 
+interface RiderAssignmentSocketAPI {
+  emit: (event: string, payload?: unknown) => void;
+}
+
 export const useRiderAssignmentSocket = ({
   onNewOrderRequest,
   onOrderStatusUpdate,
 }: UseRiderAssignmentSocketOptions) => {
-  const [socketInstance, setSocketInstance] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const token = useAuthStore((state) => state.accessToken || state.token);
+
+  const emit = useCallback((event: string, payload?: unknown) => {
+    socketRef.current?.emit(event, payload);
+  }, []);
+
+  const socketApi = useMemo<RiderAssignmentSocketAPI | null>(
+    () => (token ? { emit } : null),
+    [emit, token],
+  );
 
   useEffect(() => {
     if (!token) {
@@ -40,7 +53,7 @@ export const useRiderAssignmentSocket = ({
       timeout: 20000,
     });
 
-    setSocketInstance(socket);
+    socketRef.current = socket;
 
     socket.on("new_order_request", (payload: NewOrderRequestEvent) => {
       onNewOrderRequest?.(payload);
@@ -52,9 +65,9 @@ export const useRiderAssignmentSocket = ({
 
     return () => {
       socket.disconnect();
-      setSocketInstance(null);
+      socketRef.current = null;
     };
   }, [token, onNewOrderRequest, onOrderStatusUpdate]);
 
-  return socketInstance;
+  return socketApi;
 };

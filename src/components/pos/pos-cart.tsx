@@ -46,18 +46,22 @@ export function POSCart({
           </p>
         ) : (
           items.map((item) => (
-            <div key={item.productId} className="rounded-lg border p-3">
+            <div key={item.lineKey} className="rounded-lg border p-3">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div>
                   <p className="font-medium">{item.name}</p>
                   <p className="text-xs text-muted-foreground">
                     ${item.price.toFixed(2)} / {item.unit}
                   </p>
+                  <p className="text-xs text-muted-foreground">Variant: {item.variant}</p>
+                  {item.note ? (
+                    <p className="text-xs text-muted-foreground">Note: {item.note}</p>
+                  ) : null}
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => removeItem(item.productId)}
+                  onClick={() => removeItem(item.lineKey)}
                   className="text-red-600 hover:text-red-700"
                 >
                   Remove
@@ -70,7 +74,7 @@ export function POSCart({
                   unit={item.unit}
                   max={item.maxStock}
                   enableBulkActions={enableBulkActions}
-                  onChange={(value) => setQuantity(item.productId, value)}
+                  onChange={(value) => setQuantity(item.lineKey, value)}
                 />
                 <p className="font-semibold">
                   ${(item.price * item.quantity).toFixed(2)}

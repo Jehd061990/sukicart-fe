@@ -785,6 +785,23 @@ export default function RiderAcceptOrderPage() {
             <p>Distance: {incomingOrder.distanceKm.toFixed(2)} km</p>
             <p>Total Amount: PHP {incomingOrder.totalAmount.toFixed(2)}</p>
             <p>Items: {incomingOrder.items.length}</p>
+            <div className="rounded-md border border-deal-200 bg-white/70 p-2 text-xs text-gray-600">
+              {incomingOrder.items.slice(0, 3).map((item, index) => (
+                <p
+                  key={`${incomingOrder.orderId}-${item.productId}-${index}-${item.variant || "regular"}`}
+                  className="truncate"
+                >
+                  {item.quantity}x {item.name}
+                  {item.variant ? ` (${item.variant})` : ""}
+                  {item.note ? ` - ${item.note}` : ""}
+                </p>
+              ))}
+              {incomingOrder.items.length > 3 ? (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  +{incomingOrder.items.length - 3} more items
+                </p>
+              ) : null}
+            </div>
             <p>
               Pickup Location:{" "}
               {incomingOrder.pickupLocation
@@ -876,6 +893,23 @@ export default function RiderAcceptOrderPage() {
                       Received:{" "}
                       {new Date(offer.receivedAt).toLocaleTimeString()}
                     </p>
+                  </div>
+                  <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2 font-sans text-xs text-gray-600">
+                    {offer.items.slice(0, 2).map((item, index) => (
+                      <p
+                        key={`${offer.orderId}-${item.productId}-${index}-${item.variant || "regular"}`}
+                        className="truncate"
+                      >
+                        {item.quantity}x {item.name}
+                        {item.variant ? ` (${item.variant})` : ""}
+                        {item.note ? ` - ${item.note}` : ""}
+                      </p>
+                    ))}
+                    {offer.items.length > 2 ? (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        +{offer.items.length - 2} more items
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}

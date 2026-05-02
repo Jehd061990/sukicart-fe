@@ -1,6 +1,8 @@
 export interface POSOrderItemPayload {
   productId: string;
   quantity: number;
+  variant?: string;
+  note?: string;
 }
 
 export interface DecodeBarcodeFramePayload {

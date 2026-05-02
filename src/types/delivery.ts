@@ -57,6 +57,8 @@ export interface NewOrderRequestEvent {
     quantity: number;
     price: number;
     lineTotal: number;
+    variant?: string;
+    note?: string;
   }>;
   totalAmount: number;
   pickupLocation: GeoLocation | null;

@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { Bell, Menu, Search, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/auth.store";
 import { useCartStore } from "@/store/cart.store";
 
 interface AppHeaderProps {

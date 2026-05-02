@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { BuyerManagementTable } from "@/components/admin/buyer-management-table";
@@ -65,26 +65,29 @@ export default function AdminDashboardPage() {
   const [assignments, setAssignments] = useState<AdminRiderAssignment[]>([]);
   const isAdmin = hydrated && user?.role === "ADMIN";
 
-  const fetchAssignments = async (orderId = assignmentFilter) => {
-    if (!isAdmin) {
-      return;
-    }
+  const fetchAssignments = useCallback(
+    async (orderId = assignmentFilter) => {
+      if (!isAdmin) {
+        return;
+      }
 
-    try {
-      setAssignmentLoading(true);
-      setAssignmentError("");
-      const nextAssignments = await adminService.getRiderAssignments(
-        orderId || undefined,
-      );
-      setAssignments(nextAssignments);
-    } catch (error) {
-      setAssignmentError(
-        parseErrorMessage(error, "Failed to load rider assignment state"),
-      );
-    } finally {
-      setAssignmentLoading(false);
-    }
-  };
+      try {
+        setAssignmentLoading(true);
+        setAssignmentError("");
+        const nextAssignments = await adminService.getRiderAssignments(
+          orderId || undefined,
+        );
+        setAssignments(nextAssignments);
+      } catch (error) {
+        setAssignmentError(
+          parseErrorMessage(error, "Failed to load rider assignment state"),
+        );
+      } finally {
+        setAssignmentLoading(false);
+      }
+    },
+    [assignmentFilter, isAdmin],
+  );
 
   useEffect(() => {
     if (!hydrated) {
@@ -125,7 +128,7 @@ export default function AdminDashboardPage() {
     }, 10_000);
 
     return () => clearInterval(poller);
-  }, [isAdmin, assignmentFilter]);
+  }, [isAdmin, assignmentFilter, fetchAssignments]);
 
   const hasAnyLoading = useMemo(
     () =>
