@@ -9,7 +9,7 @@ interface ScannerViewProps {
 
 export function ScannerView({ containerRef, children }: ScannerViewProps) {
   return (
-    <div className="relative flex-1 overflow-hidden rounded-3xl bg-black shadow-xl ring-1 ring-slate-800">
+    <div className="relative min-h-[56svh] flex-1 overflow-hidden rounded-3xl bg-black shadow-xl ring-1 ring-slate-800">
       <div
         ref={containerRef}
         className="absolute inset-0 [&_canvas]:h-full [&_canvas]:w-full [&_canvas]:object-cover [&_video]:h-full [&_video]:w-full [&_video]:object-cover"

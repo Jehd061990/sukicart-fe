@@ -241,6 +241,19 @@ export default function ScannerPage() {
     onDetected: processCode,
   });
 
+  const visibleError = useMemo(() => {
+    const value = String(error || "");
+    if (!value) {
+      return "";
+    }
+
+    const isKnownNonFatalQuaggaError = /width\s*\(nan\)|height\s*\(nan\)|multiple of nan|image dimensions/i.test(
+      value,
+    );
+
+    return isKnownNonFatalQuaggaError ? "" : value;
+  }, [error]);
+
   useEffect(() => {
     if (!hydrated) {
       return;
@@ -277,9 +290,9 @@ export default function ScannerPage() {
         <FloatingAddOne entries={addOneEntries} />
       </ScannerView>
 
-      {error ? (
+      {visibleError ? (
         <p className="mt-3 rounded-xl border border-rose-300/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-          {error}
+          {visibleError}
         </p>
       ) : null}
 
