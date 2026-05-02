@@ -11,6 +11,7 @@ import { CheckoutModal } from "@/components/pos/CheckoutModal";
 import { DiscountModal } from "@/components/pos/DiscountModal";
 import { ProductCard } from "@/components/pos/ProductCard";
 import { Input } from "@/components/ui/input";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { productService } from "@/lib/api/services/product.service";
 import { posService } from "@/lib/api/services/pos.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -98,6 +99,7 @@ const barcodeVariants = (value: string) => {
 };
 
 export default function POSPage() {
+  const isMobile = useIsMobile() ?? false;
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [category, setCategory] = useState("all");
@@ -359,7 +361,16 @@ export default function POSPage() {
               onChange={setCategory}
             />
 
-            {barcodeEnabled && showBarcodeScannerPanel ? (
+            {barcodeEnabled && showBarcodeScannerPanel && isMobile ? (
+              <Link
+                href="/scanner"
+                className="flex h-12 items-center justify-center rounded-2xl bg-brand-600 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+              >
+                Scan Item
+              </Link>
+            ) : null}
+
+            {barcodeEnabled && showBarcodeScannerPanel && !isMobile ? (
               <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
                 <div
                   className={`mb-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${scannerStatusClassName}`}

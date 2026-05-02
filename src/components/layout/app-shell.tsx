@@ -12,7 +12,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const isMarketingRoute =
     pathname === "/" ||
     pathname.startsWith("/register") ||
-    pathname.startsWith("/login");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/scanner");
 
   if (isMarketingRoute) {
     return <main className="min-h-screen">{children}</main>;
