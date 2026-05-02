@@ -12,6 +12,7 @@ import { useComboScanner } from "@/components/scanner/use-combo-scanner";
 import { useScanner } from "@/components/scanner/use-scanner";
 import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { cacheProducts, getCachedProductsPayload } from "@/lib/offline/products-cache";
 import { productService } from "@/lib/api/services/product.service";
 import { useAuthStore } from "@/store/auth.store";
 import { usePOSCartStore } from "@/store/pos-cart.store";
@@ -102,7 +103,15 @@ export default function ScannerPage() {
 
   const productsQuery = useQuery({
     queryKey: ["products", "scanner"],
-    queryFn: () => productService.getMine({ page: 1, limit: 120 }),
+    queryFn: async () => {
+      try {
+        const payload = await productService.getMine({ page: 1, limit: 120 });
+        await cacheProducts(payload);
+        return payload;
+      } catch {
+        return getCachedProductsPayload();
+      }
+    },
     enabled: role === "POS",
   });
 

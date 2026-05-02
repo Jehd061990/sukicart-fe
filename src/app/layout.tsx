@@ -26,6 +26,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SukiCart Dashboard",
   description: "SukiCart frontend control panel",
+  manifest: "/manifest.webmanifest",
+  applicationName: "SukiCart",
+  themeColor: "#2f9257",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SukiCart",
+  },
 };
 
 export default function RootLayout({

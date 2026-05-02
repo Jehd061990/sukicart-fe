@@ -15,6 +15,7 @@ export interface POSCartItem {
 
 interface POSCartState {
   items: POSCartItem[];
+  hydrateItems: (items: POSCartItem[]) => void;
   addItem: (product: Product) => void;
   addConfiguredItem: (
     product: Product,
@@ -38,6 +39,25 @@ const getProductQuantityInCart = (items: POSCartItem[], productId: string) =>
 
 export const usePOSCartStore = create<POSCartState>((set, get) => ({
   items: [],
+
+  hydrateItems: (items) => {
+    const normalized = (items || []).map((item) => {
+      const variant = normalizeText(item.variant) || "Regular";
+      const note = normalizeText(item.note);
+      const lineKey =
+        normalizeText(item.lineKey) ||
+        buildLineKey(item.productId, variant, note);
+
+      return {
+        ...item,
+        lineKey,
+        variant,
+        note,
+      };
+    });
+
+    set({ items: normalized });
+  },
 
   addItem: (product) => {
     get().addConfiguredItem(product, { quantity: 1, variant: "Regular", note: "" });

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import { BarcodeScannerPanel, ScannerStatusTone } from "@/components/pos/barcode-scanner-panel";
 import { CartBar } from "@/components/pos/CartBar";
 import { CartItem } from "@/components/pos/CartItem";
@@ -12,8 +13,10 @@ import { DiscountModal } from "@/components/pos/DiscountModal";
 import { ProductCard } from "@/components/pos/ProductCard";
 import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { cacheProducts, getCachedProductsPayload } from "@/lib/offline/products-cache";
 import { productService } from "@/lib/api/services/product.service";
 import { posService } from "@/lib/api/services/pos.service";
+import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
 import { useAuthStore } from "@/store/auth.store";
 import { usePOSCartStore } from "@/store/pos-cart.store";
 import { Product } from "@/types/product";
@@ -127,7 +130,15 @@ export default function POSPage() {
 
   const productsQuery = useQuery({
     queryKey: ["products"],
-    queryFn: () => productService.getMine({ page: 1, limit: 50 }),
+    queryFn: async () => {
+      try {
+        const payload = await productService.getMine({ page: 1, limit: 50 });
+        await cacheProducts(payload);
+        return payload;
+      } catch {
+        return getCachedProductsPayload();
+      }
+    },
   });
 
   const storeConfigQuery = useQuery({
@@ -276,9 +287,9 @@ export default function POSPage() {
   };
 
   const submitMutation = useMutation({
-    mutationFn: () =>
-      posService.createOrder({
-        paymentMethod: "cash",
+    mutationFn: async () => {
+      const payload = {
+        paymentMethod: "cash" as const,
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -286,13 +297,45 @@ export default function POSPage() {
           note: item.note,
         })),
         scannedCode: barcodeEnabled ? barcodeInput.trim() : "",
-      }),
+      };
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await enqueuePOSOrder({
+          ...payload,
+          createdAt: Date.now(),
+        }, "offline");
+        return { queuedOffline: true, orderId: `offline-${Date.now()}` };
+      }
+
+      try {
+        const result = await posService.createOrder(payload);
+        return {
+          queuedOffline: false,
+          orderId: result.order._id,
+        };
+      } catch (error) {
+        if (axios.isAxiosError(error) && !error.response) {
+          await enqueuePOSOrder({
+            ...payload,
+            createdAt: Date.now(),
+          }, "network-failure");
+          return { queuedOffline: true, orderId: `offline-${Date.now()}` };
+        }
+
+        throw error;
+      }
+    },
     onSuccess: (result) => {
       clearCart();
       setDiscountAmount(0);
       setCheckoutOpen(false);
-      setScannerStatus(`Order created: ${result.order._id}`);
-      setScannerStatusTone("success");
+      if (result.queuedOffline) {
+        setScannerStatus("Offline: order queued for sync");
+        setScannerStatusTone("warning");
+      } else {
+        setScannerStatus(`Order created: ${result.orderId}`);
+        setScannerStatusTone("success");
+      }
       productsQuery.refetch();
     },
     onError: (error: unknown) => {
