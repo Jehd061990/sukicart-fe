@@ -36,7 +36,7 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
       { label: "Home", href: "/buyer/home", icon: House },
       { label: "Product List", href: "/buyer/products", icon: Package },
       { label: "Cart", href: "/buyer/cart", icon: ShoppingBasket },
-      { label: "Checkout (COD)", href: "/buyer/checkout", icon: Receipt },
+      { label: "Checkout", href: "/buyer/checkout", icon: Receipt },
       { label: "Order Tracking", href: "/buyer/tracking", icon: Truck },
     ],
   },

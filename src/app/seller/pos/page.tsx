@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { SellerSubscriptionForm } from "@/components/seller/SellerSubscriptionForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { posService } from "@/lib/api/services/pos.service";
@@ -11,7 +12,6 @@ export default function SellerPOSPage() {
   const [posName, setPosName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [additionalSlots, setAdditionalSlots] = useState("1");
   const [editingPosId, setEditingPosId] = useState<string | null>(null);
   const [editPosName, setEditPosName] = useState("");
   const [editUsername, setEditUsername] = useState("");
@@ -106,34 +106,6 @@ export default function SellerPOSPage() {
     },
   });
 
-  const upgradeSlotsMutation = useMutation({
-    mutationFn: () =>
-      posService.upgradePOSSlots({
-        additionalSlots: Number(additionalSlots),
-      }),
-    onSuccess: (result) => {
-      toast.success(result.message);
-      setAdditionalSlots("1");
-      posListQuery.refetch();
-    },
-    onError: (error: unknown) => {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof error.response === "object" &&
-        error.response !== null &&
-        "data" in error.response &&
-        typeof error.response.data === "object" &&
-        error.response.data !== null &&
-        "message" in error.response.data
-          ? String(error.response.data.message)
-          : "Failed to upgrade POS slots";
-
-      toast.error(message);
-    },
-  });
-
   const forceLogoutMutation = useMutation({
     mutationFn: (sessionId: string) => posService.forceLogoutSession(sessionId),
     onSuccess: () => {
@@ -186,18 +158,6 @@ export default function SellerPOSPage() {
     });
   };
 
-  const submitUpgrade = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const parsed = Number(additionalSlots);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      toast.error("Additional slots must be a positive whole number");
-      return;
-    }
-
-    upgradeSlotsMutation.mutate();
-  };
-
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-brand-200 bg-linear-to-br from-brand-50 via-white to-deal-50 p-6 shadow-sm">
@@ -210,30 +170,7 @@ export default function SellerPOSPage() {
         <p className="mt-2 font-sans text-sm text-gray-700">{usageLabel}</p>
       </section>
 
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <h2 className="font-heading text-xl font-semibold text-slate-900">
-          Subscription & Additional POS Slots
-        </h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Add more POS slots for new cashier accounts. Current capacity is taken from your POS subscription.
-        </p>
-        <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={submitUpgrade}>
-          <Input
-            type="number"
-            min={1}
-            value={additionalSlots}
-            onChange={(event) => setAdditionalSlots(event.target.value)}
-            placeholder="Additional slots"
-            className="sm:max-w-xs"
-          />
-          <Button type="submit" disabled={upgradeSlotsMutation.isPending}>
-            {upgradeSlotsMutation.isPending ? "Upgrading..." : "Upgrade POS Slots"}
-          </Button>
-        </form>
-        <p className="mt-2 text-xs text-gray-500">
-          Note: this currently simulates successful payment; connect your payment gateway for live billing.
-        </p>
-      </section>
+      <SellerSubscriptionForm />
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <h2 className="font-heading text-xl font-semibold text-slate-900">
