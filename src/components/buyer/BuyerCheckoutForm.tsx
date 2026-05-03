@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -44,6 +44,11 @@ export function BuyerCheckoutForm() {
   const [buyerLng, setBuyerLng] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [locationDetected, setLocationDetected] = useState(false);
+  const isHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const { createCheckoutMutation, paymentStatusQuery } = usePayment(paymentIdFromUrl);
 
@@ -59,12 +64,15 @@ export function BuyerCheckoutForm() {
 
   const orderItems = useMemo(
     () =>
-      items.map((item) => ({
+      (isHydrated ? items : []).map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
       })),
-    [items],
+    [isHydrated, items],
   );
+
+  const displayItems = isHydrated ? items : [];
+  const displaySubtotal = isHydrated ? subtotal : 0;
 
   const fetchCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -162,11 +170,11 @@ export function BuyerCheckoutForm() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {displayItems.length === 0 ? (
             <p className="font-sans text-sm text-gray-700">Your cart is currently empty.</p>
           ) : (
             <div className="space-y-2">
-              {items.map((item) => (
+              {displayItems.map((item) => (
                 <div
                   key={item.productId}
                   className="flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2"
@@ -183,7 +191,7 @@ export function BuyerCheckoutForm() {
 
           <div className="mt-4 flex items-center justify-between border-t border-brand-200 pt-3">
             <span className="font-sans text-sm text-gray-700">Total</span>
-            <span className="font-heading text-lg font-semibold text-brand-900">PHP {subtotal.toFixed(2)}</span>
+            <span className="font-heading text-lg font-semibold text-brand-900">PHP {displaySubtotal.toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
@@ -263,7 +271,7 @@ export function BuyerCheckoutForm() {
           <div className="mt-4 flex justify-end">
             <Button
               onClick={onCheckout}
-              disabled={createCheckoutMutation.isPending || items.length === 0}
+              disabled={createCheckoutMutation.isPending || !isHydrated || displayItems.length === 0}
               className="bg-brand-600 text-white hover:bg-brand-700"
             >
               {createCheckoutMutation.isPending ? "Redirecting..." : "Proceed to Payment"}
