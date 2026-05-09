@@ -43,7 +43,7 @@ const getStableDeviceId = () => {
     return "server-device";
   }
 
-  const storageKey = "sukicart-device-id";
+  const storageKey = "sukigo-device-id";
   const existing = window.localStorage.getItem(storageKey);
   if (existing) {
     return existing;
@@ -120,7 +120,7 @@ export default function LoginPage() {
             Login Portal
           </p>
           <h1 className="mt-2 font-heading text-3xl font-semibold text-emerald-950 sm:text-4xl">
-            Access Your SukiCart Workspace
+            Access Your SukiGo Workspace
           </h1>
           <p className="mt-3 font-sans text-base text-gray-600">
             Sign in once with your account credentials and we will route you to the correct workspace automatically.
@@ -195,7 +195,7 @@ export default function LoginPage() {
                 Automatic Role Routing
               </p>
               <p className="mt-1 font-sans text-sm text-gray-600">
-                After login, SukiCart detects whether your account is Admin, Buyer, Seller, POS, or Rider and redirects you to the correct dashboard.
+                After login, SukiGo detects whether your account is Admin, Buyer, Seller, POS, or Rider and redirects you to the correct dashboard.
               </p>
             </div>
 

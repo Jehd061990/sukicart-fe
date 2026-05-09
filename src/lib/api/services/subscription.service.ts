@@ -3,9 +3,12 @@ import {
   AddonSlotsPreviewResponse,
   CancelSubscriptionResponse,
   CurrentSubscriptionResponse,
+  GetAccessControlResponse,
   SubscriptionCheckoutPayload,
   SubscriptionCheckoutResponse,
   SubscriptionPlansResponse,
+  UpdateAccessControlPayload,
+  UpdateAccessControlResponse,
   UpdateAddonSlotsPayload,
   UpdateAddonSlotsResponse,
 } from "@/types/subscription";
@@ -18,6 +21,19 @@ export const subscriptionService = {
 
   getCurrentSubscription: async () => {
     const { data } = await apiClient.get<CurrentSubscriptionResponse>("/subscription/me");
+    return data;
+  },
+
+  getAccessControl: async () => {
+    const { data } = await apiClient.get<GetAccessControlResponse>("/subscription/access-control");
+    return data;
+  },
+
+  updateAccessControl: async (payload: UpdateAccessControlPayload) => {
+    const { data } = await apiClient.patch<UpdateAccessControlResponse>(
+      "/subscription/access-control",
+      payload,
+    );
     return data;
   },
 

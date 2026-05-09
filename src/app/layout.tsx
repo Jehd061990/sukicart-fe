@@ -24,14 +24,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SukiCart Dashboard",
-  description: "SukiCart frontend control panel",
+  title: "SukiGo Dashboard",
+  description: "SukiGo frontend control panel",
   manifest: "/manifest.webmanifest",
-  applicationName: "SukiCart",
+  applicationName: "SukiGo",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "SukiCart",
+    title: "SukiGo",
   },
 };
 

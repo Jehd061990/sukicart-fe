@@ -181,7 +181,7 @@ export default function Home() {
         <div className="mx-auto w-full max-w-6xl">
           <CTASection
             title="Sugdi na karon!"
-            subtitle="Join SukiCart today as a buyer or seller and bring the local market online."
+            subtitle="Join SukiGo today as a buyer or seller and bring the local market online."
             primaryLabel="Start Buying"
             primaryHref="/register/buyer"
             secondaryLabel="Start Selling"

@@ -1,6 +1,6 @@
-# SukiCart Brand Identity
+# SukiGo Brand Identity
 
-SukiCart should feel fresh, trustworthy, and approachable for local wet market buyers and sellers.
+SukiGo should feel fresh, trustworthy, and approachable for local wet market buyers and sellers.
 
 ## Brand Personality
 

@@ -1,4 +1,5 @@
 import { PaymentStatus, SubscriptionPlanCode, SubscriptionStatus } from "@/types/payment";
+import { SellerFeatureFlags } from "@/types/saas-dashboard";
 
 export interface SubscriptionPlanFeatureMap {
   branchManagement: boolean;
@@ -50,6 +51,18 @@ export interface CurrentSubscription {
   nextBillingDate: string | null;
   activatedAt: string | null;
   startedAt: string | null;
+  featureFlags?: SellerFeatureFlags;
+  activePermissions?: string[];
+  accessOverrides?: {
+    features: {
+      enabled: Array<keyof SellerFeatureFlags>;
+      disabled: Array<keyof SellerFeatureFlags>;
+    };
+    permissions: {
+      granted: string[];
+      revoked: string[];
+    };
+  };
   downgradeWarning?: string;
 }
 
@@ -149,6 +162,40 @@ export interface AddonSlotsPreviewResponse {
 export interface CancelSubscriptionResponse {
   message: string;
   subscription: CurrentSubscription;
+}
+
+export interface AccessControlState {
+  plan: SubscriptionPlanCode;
+  allowedFeatureKeys: Array<keyof SellerFeatureFlags>;
+  featureFlags: SellerFeatureFlags;
+  activePermissions: string[];
+  overrides: {
+    features: {
+      enabled: Array<keyof SellerFeatureFlags>;
+      disabled: Array<keyof SellerFeatureFlags>;
+    };
+    permissions: {
+      granted: string[];
+      revoked: string[];
+    };
+  };
+}
+
+export interface UpdateAccessControlPayload {
+  featureOverrides: {
+    enabled: Array<keyof SellerFeatureFlags>;
+    disabled: Array<keyof SellerFeatureFlags>;
+  };
+  permissionOverrides: {
+    granted: string[];
+    revoked: string[];
+  };
+}
+
+export type GetAccessControlResponse = AccessControlState;
+
+export interface UpdateAccessControlResponse extends AccessControlState {
+  message: string;
 }
 
 export interface Branch {

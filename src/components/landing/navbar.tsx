@@ -8,7 +8,7 @@ export function Navbar() {
           href="/"
           className="text-lg font-black tracking-tight text-emerald-800"
         >
-          SukiCart
+          SukiGo
         </Link>
 
         <nav className="flex items-center gap-2 sm:gap-3">

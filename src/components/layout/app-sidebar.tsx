@@ -50,7 +50,7 @@ export function AppSidebar({
       <div className="mb-6 flex items-start justify-between gap-3 px-2">
         <div>
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
-            SukiCart
+            SukiGo
           </p>
           <h1 className="text-xl font-semibold leading-tight">
             {user?.name || "Guest"}

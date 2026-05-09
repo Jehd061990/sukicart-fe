@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "SukiCart",
-    short_name: "SukiCart",
-    description: "SukiCart offline-ready POS and marketplace operations app",
+    name: "SukiGo",
+    short_name: "SukiGo",
+    description: "SukiGo offline-ready POS and marketplace operations app",
     start_url: "/",
     scope: "/",
     display: "standalone",

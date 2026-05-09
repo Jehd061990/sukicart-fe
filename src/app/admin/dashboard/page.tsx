@@ -160,7 +160,7 @@ export default function AdminDashboardPage() {
           Platform Control Center
         </h1>
         <p className="mt-2 font-sans text-sm text-gray-700">
-          Manage sellers, riders, buyers, and order operations for SukiCart.
+          Manage sellers, riders, buyers, and order operations for SukiGo.
         </p>
         {hasAnyLoading ? (
           <p className="mt-3 font-sans text-xs font-medium text-deal-700">
