@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import axios from "axios";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,14 +32,18 @@ const parseErrorMessage = (error: unknown) => {
 };
 
 export function BuyerCheckoutForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const paymentQueryState = String(searchParams.get("payment") || "")
+    .trim()
+    .toLowerCase();
   const paymentIdFromUrl = searchParams.get("paymentId") || undefined;
 
   const items = useCartStore((state) => state.items);
   const subtotal = useCartStore((state) => state.subtotal());
   const clearCart = useCartStore((state) => state.clearCart);
 
-  const [paymentMethod, setPaymentMethod] = useState<"gcash" | "maya" | "bank">("gcash");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("online");
   const [buyerLat, setBuyerLat] = useState("");
   const [buyerLng, setBuyerLng] = useState("");
   const [isLocating, setIsLocating] = useState(false);
@@ -50,9 +54,15 @@ export function BuyerCheckoutForm() {
     () => false,
   );
 
-  const { createCheckoutMutation, paymentStatusQuery } = usePayment(paymentIdFromUrl);
+  const { createCheckoutMutation, paymentStatusQuery } = usePayment(
+    paymentIdFromUrl,
+    {
+      sync: paymentQueryState === "success",
+    },
+  );
 
   const paymentStatus = paymentStatusQuery.data?.payment?.status || "";
+  const showCancelledNotice = paymentQueryState === "cancelled" || paymentQueryState === "failed";
 
   useEffect(() => {
     if (paymentStatus !== "paid") {
@@ -132,7 +142,13 @@ export function BuyerCheckoutForm() {
             : null,
       });
 
-      window.location.href = response.payment.checkoutUrl;
+      if (paymentMethod === "online" && response.payment.checkoutUrl) {
+        router.push(`/buyer/checkout/online?paymentId=${response.payment.id}`);
+        return;
+      }
+
+      clearCart();
+      toast.success("Order placed. Pay when order arrives.");
     } catch (error) {
       toast.error(parseErrorMessage(error));
     }
@@ -150,6 +166,16 @@ export function BuyerCheckoutForm() {
           </p>
         </CardHeader>
       </Card>
+
+      {showCancelledNotice ? (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="py-4">
+            <p className="font-sans text-sm font-medium text-amber-900">
+              Payment was cancelled. You are back on checkout and can choose COD or retry online payment.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {paymentIdFromUrl ? (
         <Card className="border-brand-200">
@@ -206,26 +232,18 @@ export function BuyerCheckoutForm() {
           <label className="flex items-center gap-2 text-sm">
             <input
               type="radio"
-              checked={paymentMethod === "gcash"}
-              onChange={() => setPaymentMethod("gcash")}
+              checked={paymentMethod === "cod"}
+              onChange={() => setPaymentMethod("cod")}
             />
-            GCash
+            COD - Pay when order arrives
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="radio"
-              checked={paymentMethod === "maya"}
-              onChange={() => setPaymentMethod("maya")}
+              checked={paymentMethod === "online"}
+              onChange={() => setPaymentMethod("online")}
             />
-            Maya
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              checked={paymentMethod === "bank"}
-              onChange={() => setPaymentMethod("bank")}
-            />
-            Bank Transfer
+            Online Payment - GCash, Maya, Bank, Cards
           </label>
         </CardContent>
       </Card>
@@ -274,7 +292,13 @@ export function BuyerCheckoutForm() {
               disabled={createCheckoutMutation.isPending || !isHydrated || displayItems.length === 0}
               className="bg-brand-600 text-white hover:bg-brand-700"
             >
-              {createCheckoutMutation.isPending ? "Redirecting..." : "Proceed to Payment"}
+              {createCheckoutMutation.isPending
+                ? paymentMethod === "online"
+                  ? "Redirecting..."
+                  : "Placing order..."
+                : paymentMethod === "online"
+                  ? "Proceed to Payment"
+                  : "Place COD Order"}
             </Button>
           </div>
         </CardContent>

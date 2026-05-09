@@ -38,8 +38,6 @@ const ORDER_STATUS_TONE: Partial<Record<MarketplaceOrder["status"], string>> = {
   arrived_at_buyer: "bg-emerald-100 text-emerald-800 border-emerald-300",
   delivered: "bg-green-100 text-green-800 border-green-300",
   completed: "bg-green-100 text-green-800 border-green-300",
-  cancelled: "bg-rose-100 text-rose-800 border-rose-300",
-  declined: "bg-rose-100 text-rose-800 border-rose-300",
 };
 
 type BuyerOrderCardProps = {
@@ -57,7 +55,7 @@ function BuyerOrderCard({ buyerOrder, onOpen, onTrack }: BuyerOrderCardProps) {
             {buyerOrder.id}
           </p>
           <Badge
-            variant="outline"
+            variant="secondary"
             className={
               ORDER_STATUS_TONE[buyerOrder.status] ||
               "bg-slate-100 text-slate-700 border-slate-300"
@@ -227,7 +225,7 @@ export function BuyerTrackingPanel() {
               </p>
             </div>
             <Badge
-              variant="outline"
+              variant="secondary"
               className="w-fit border-slate-300 bg-white text-slate-700"
             >
               {buyerOrders.length} orders

@@ -65,8 +65,6 @@ const ORDER_STATUS_TONE: Partial<Record<MarketplaceOrder["status"], string>> = {
   arrived_at_buyer: "bg-emerald-100 text-emerald-800 border-emerald-300",
   delivered: "bg-green-100 text-green-800 border-green-300",
   completed: "bg-green-100 text-green-800 border-green-300",
-  cancelled: "bg-rose-100 text-rose-800 border-rose-300",
-  declined: "bg-rose-100 text-rose-800 border-rose-300",
 };
 
 type OrderCardProps = {
@@ -95,7 +93,7 @@ function OrderCard({
             </p>
           </div>
           <Badge
-            variant="outline"
+            variant="secondary"
             className={
               ORDER_STATUS_TONE[orderItem.status] ||
               "bg-slate-100 text-slate-700 border-slate-300"
@@ -488,13 +486,13 @@ export function SellerTrackingPanel() {
             </div>
             <div className="flex items-center gap-2">
               <Badge
-                variant="outline"
+                variant="secondary"
                 className="border-slate-300 bg-white text-slate-700"
               >
                 {sellerOrders.length} orders
               </Badge>
               <Badge
-                variant="outline"
+                variant="secondary"
                 className="border-emerald-300 bg-emerald-50 text-emerald-700"
               >
                 Auto-refresh 5s
@@ -614,7 +612,7 @@ export function SellerTrackingPanel() {
 
       {selectedOrder ? (
         <div className="fixed inset-0 z-2000 flex items-center justify-center bg-black/60 p-4">
-          <div className="relative z-2001 w-full max-w-2xl rounded-xl border bg-card p-5 shadow-xl">
+          <div className="relative z-2001 w-full max-w-2xl rounded-xl border bg-card p-5 shadow-xl overflow-auto">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-heading text-lg font-medium">

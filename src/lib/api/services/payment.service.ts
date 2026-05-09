@@ -18,9 +18,12 @@ export const paymentService = {
     return data;
   },
 
-  getPaymentStatus: async (paymentId: string) => {
+  getPaymentStatus: async (paymentId: string, options?: { sync?: boolean }) => {
     const { data } = await apiClient.get<GetPaymentStatusResponse>(
       `/payments/${paymentId}`,
+      {
+        params: options?.sync ? { sync: "true" } : undefined,
+      },
     );
     return data;
   },

@@ -8,7 +8,7 @@ export interface BuyerCheckoutItem {
 
 export interface BuyerCheckoutPayload {
   items: BuyerCheckoutItem[];
-  paymentMethod: "gcash" | "maya" | "bank";
+  paymentMethod: "cod" | "online";
   buyerLocation?: {
     lat: number;
     lng: number;
