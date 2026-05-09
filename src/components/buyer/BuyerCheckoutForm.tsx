@@ -63,6 +63,8 @@ export function BuyerCheckoutForm() {
 
   const paymentStatus = paymentStatusQuery.data?.payment?.status || "";
   const showCancelledNotice = paymentQueryState === "cancelled" || paymentQueryState === "failed";
+  const showPaymentSuccessNotice =
+    paymentQueryState === "success" && paymentStatus === "paid";
 
   useEffect(() => {
     if (paymentStatus !== "paid") {
@@ -172,6 +174,16 @@ export function BuyerCheckoutForm() {
           <CardContent className="py-4">
             <p className="font-sans text-sm font-medium text-amber-900">
               Payment was cancelled. You are back on checkout and can choose COD or retry online payment.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {showPaymentSuccessNotice ? (
+        <Card className="border-emerald-300 bg-emerald-50">
+          <CardContent className="py-4">
+            <p className="font-sans text-sm font-medium text-emerald-900">
+              Payment confirmed. Notifying seller and preparing your order.
             </p>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { SellerSubscriptionForm } from "@/components/seller/SellerSubscriptionForm";
@@ -170,7 +170,9 @@ export default function SellerPOSPage() {
         <p className="mt-2 font-sans text-sm text-gray-700">{usageLabel}</p>
       </section>
 
-      <SellerSubscriptionForm />
+      <Suspense fallback={<section className="rounded-2xl border bg-white p-5 text-sm text-gray-600 shadow-sm">Loading subscription checkout...</section>}>
+        <SellerSubscriptionForm />
+      </Suspense>
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <h2 className="font-heading text-xl font-semibold text-slate-900">

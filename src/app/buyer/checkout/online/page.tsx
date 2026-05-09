@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePayment } from "@/hooks/usePayment";
 
-export default function BuyerOnlinePaymentPage() {
+function BuyerOnlinePaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paymentId = searchParams.get("paymentId") || "";
@@ -90,5 +90,13 @@ export default function BuyerOnlinePaymentPage() {
         </Button>
       </div>
     </section>
+  );
+}
+
+export default function BuyerOnlinePaymentPage() {
+  return (
+    <Suspense fallback={<section className="px-4 py-6 text-sm text-gray-600">Loading payment details...</section>}>
+      <BuyerOnlinePaymentContent />
+    </Suspense>
   );
 }

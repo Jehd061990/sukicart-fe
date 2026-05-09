@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Poppins } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppProvider } from "@/providers/app-provider";
@@ -28,12 +28,15 @@ export const metadata: Metadata = {
   description: "SukiCart frontend control panel",
   manifest: "/manifest.webmanifest",
   applicationName: "SukiCart",
-  themeColor: "#2f9257",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "SukiCart",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2f9257",
 };
 
 export default function RootLayout({
