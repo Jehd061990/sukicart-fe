@@ -46,7 +46,12 @@ export interface POSAccount {
   id: string;
   posName: string;
   username: string;
+  email?: string;
   status: "active" | "inactive" | "pending";
+  branchId?: string | null;
+  branchName?: string;
+  assignedUserId?: string | null;
+  deviceStatus?: "active" | "inactive" | "suspended";
   isDeactivated: boolean;
   createdAt: string;
   activeSession: DeviceSession | null;
@@ -59,15 +64,23 @@ export interface POSUsage {
 
 export interface CreatePOSPayload {
   posName: string;
+  email?: string;
   username?: string;
   password?: string;
   autoGeneratePassword?: boolean;
+  branchId?: string;
+  assignedUserId?: string;
+  deviceStatus?: "active" | "inactive" | "suspended";
 }
 
 export interface UpdatePOSPayload {
   posName?: string;
+  email?: string;
   username?: string;
   password?: string;
+  branchId?: string;
+  assignedUserId?: string;
+  deviceStatus?: "active" | "inactive" | "suspended";
 }
 
 export interface UpgradePOSSlotsPayload {
@@ -93,7 +106,10 @@ export interface SessionListResponse {
 export interface UpgradePOSSlotsResponse {
   message: string;
   subscription: {
+    includedSlots?: number;
+    addonSlots?: number;
     totalSlots: number;
+    monthlyPrice?: number;
     loginPolicy: "REJECT" | "INVALIDATE_OLDEST";
   };
   usage: POSUsage;

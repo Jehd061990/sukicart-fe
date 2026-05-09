@@ -2,26 +2,27 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { paymentService } from "@/lib/api/services/payment.service";
-import { CreateSubscriptionCheckoutPayload } from "@/types/payment";
+import { subscriptionService } from "@/lib/api/services/subscription.service";
+import { SubscriptionCheckoutPayload } from "@/types/subscription";
 
 export const useSubscription = (paymentId?: string) => {
   const createSubscriptionMutation = useMutation({
-    mutationFn: (payload: CreateSubscriptionCheckoutPayload) =>
-      paymentService.createSubscriptionCheckout(payload),
+    mutationFn: (payload: SubscriptionCheckoutPayload) =>
+      subscriptionService.checkoutPlan(payload),
   });
 
   const subscriptionQuery = useQuery({
     queryKey: ["seller-subscription", "me"],
-    queryFn: paymentService.getMySubscription,
+    queryFn: subscriptionService.getCurrentSubscription,
   });
 
   const cancelSubscriptionMutation = useMutation({
-    mutationFn: paymentService.cancelMySubscription,
+    mutationFn: subscriptionService.cancelCurrentSubscription,
   });
 
   const paymentStatusQuery = useQuery({
     queryKey: ["subscription-payment-status", paymentId],
-    queryFn: () => paymentService.getPaymentStatus(String(paymentId)),
+    queryFn: () => paymentService.getPaymentStatus(String(paymentId), { sync: true }),
     enabled: Boolean(paymentId),
     refetchInterval: (query) =>
       query.state.data?.payment?.status === "pending" ? 3500 : false,

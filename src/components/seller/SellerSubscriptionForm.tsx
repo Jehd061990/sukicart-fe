@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useSubscription } from "@/hooks/useSubscription";
 
 const PLAN_OPTIONS = [
-  { code: "BASIC", name: "Basic", price: 499, slots: 1 },
+  { code: "FREE", name: "Free", price: 0, slots: 1 },
   { code: "PRO", name: "Pro", price: 999, slots: 3 },
   { code: "BUSINESS", name: "Business", price: 1999, slots: 8 },
 ] as const;
@@ -15,7 +15,7 @@ const PLAN_OPTIONS = [
 export function SellerSubscriptionForm() {
   const searchParams = useSearchParams();
   const paymentIdFromUrl = searchParams.get("paymentId") || undefined;
-  const [selectedPlan, setSelectedPlan] = useState<"BASIC" | "PRO" | "BUSINESS">("BASIC");
+  const [selectedPlan, setSelectedPlan] = useState<"FREE" | "PRO" | "BUSINESS">("FREE");
 
   const {
     createSubscriptionMutation,
@@ -39,7 +39,12 @@ export function SellerSubscriptionForm() {
         plan: selectedPlan,
       });
 
-      window.location.href = response.payment.checkoutUrl;
+      if (response.payment?.checkoutUrl) {
+        window.location.href = response.payment.checkoutUrl;
+      } else {
+        toast.success(response.message);
+        subscriptionQuery.refetch();
+      }
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&
@@ -136,6 +141,18 @@ export function SellerSubscriptionForm() {
           </p>
           <p>
             Subscription status: <span className="font-semibold uppercase">{currentSubscription.status}</span>
+          </p>
+          <p>
+            Included slots: <span className="font-semibold">{currentSubscription.includedSlots}</span>
+          </p>
+          <p>
+            Addon slots: <span className="font-semibold">{currentSubscription.addonSlots}</span>
+          </p>
+          <p>
+            Total slots: <span className="font-semibold">{currentSubscription.totalSlots}</span>
+          </p>
+          <p>
+            Monthly billing: <span className="font-semibold">PHP {currentSubscription.monthlyPrice}</span>
           </p>
           <p>
             Next billing date:{" "}

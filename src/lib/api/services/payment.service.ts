@@ -30,7 +30,7 @@ export const paymentService = {
 
   createSubscriptionCheckout: async (payload: CreateSubscriptionCheckoutPayload) => {
     const { data } = await apiClient.post<CreateSubscriptionCheckoutResponse>(
-      "/subscription/create",
+      "/subscription/checkout",
       payload,
     );
     return data;
