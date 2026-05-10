@@ -1,0 +1,1 @@
+export const SELLER_PENDING_LOGIN_KEY = "sukigo-seller-pending-login";
