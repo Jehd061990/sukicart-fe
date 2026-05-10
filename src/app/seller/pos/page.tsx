@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Info, Minus, Plus, X } from "lucide-react";
@@ -60,7 +60,7 @@ const statusVariant = (status: string) => {
   return "secondary" as const;
 };
 
-export default function SellerPOSPage() {
+function SellerPOSPageContent() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const paymentIdFromUrl = searchParams.get("paymentId") || undefined;
@@ -285,6 +285,7 @@ export default function SellerPOSPage() {
     mutationFn: (payload: {
       id: string;
       posName?: string;
+      email?: string;
       username?: string;
       password?: string;
       branchId?: string;
@@ -1348,5 +1349,13 @@ export default function SellerPOSPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function SellerPOSPage() {
+  return (
+    <Suspense>
+      <SellerPOSPageContent />
+    </Suspense>
   );
 }
