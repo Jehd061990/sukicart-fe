@@ -11,6 +11,7 @@ import { FileUpload } from "@/components/forms/file-upload";
 import { CheckboxField } from "@/components/forms/checkbox-field";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { sellerService } from "@/lib/api/services/seller.service";
+import { SELLER_PENDING_LOGIN_KEY } from "@/constants/seller-pending";
 import { useSellerRegistrationStore } from "@/store/seller-registration.store";
 import {
   normalizeSellerStoreType,
@@ -120,9 +121,16 @@ export function StepperForm() {
       setSubmitSuccess(true);
       toast.success("Registration successful! Waiting for approval.");
       clearDraft();
-      setTimeout(() => {
-        router.push("/seller/dashboard");
-      }, 1200);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          SELLER_PENDING_LOGIN_KEY,
+          JSON.stringify({
+            identifier: formValues.email,
+            password: formValues.password,
+          }),
+        );
+      }
+      router.push("/seller/pending");
     } catch (error: unknown) {
       const message =
         typeof error === "object" &&
