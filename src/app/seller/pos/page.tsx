@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Info, Minus, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,33 @@ import { branchService } from "@/lib/api/services/branch.service";
 import { paymentService } from "@/lib/api/services/payment.service";
 import { posService } from "@/lib/api/services/pos.service";
 import { subscriptionService } from "@/lib/api/services/subscription.service";
+import {
+  POS_SELLER_DEFAULT_RETURN_PATH,
+  POS_SELLER_AUTH_BACKUP_KEY,
+  POS_SELLER_RETURN_PATH_KEY,
+  POS_SELLER_SWITCH_FLAG_KEY,
+  POS_SELLER_SWITCH_FLAG_VALUE,
+} from "@/constants/pos-switch";
+import { useAuthStore } from "@/store/auth.store";
 import { SubscriptionPlanCode } from "@/types/payment";
 
 const SLOT_UNIT_PRICE = 299;
+
+const getStableDeviceId = () => {
+  if (typeof window === "undefined") {
+    return "server-device";
+  }
+
+  const storageKey = "sukigo-device-id";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const generated = crypto.randomUUID();
+  window.localStorage.setItem(storageKey, generated);
+  return generated;
+};
 
 const asErrorMessage = (error: unknown, fallback: string) => {
   if (
@@ -62,6 +86,8 @@ const statusVariant = (status: string) => {
 
 function SellerPOSPageContent() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const setAuth = useAuthStore((state) => state.setAuth);
   const searchParams = useSearchParams();
   const paymentIdFromUrl = searchParams.get("paymentId") || undefined;
 
@@ -334,6 +360,42 @@ function SellerPOSPageContent() {
     },
   });
 
+  const launchPOSMutation = useMutation({
+    mutationFn: ({ id }: { id: string; posName: string }) =>
+      posService.launchPOSAccount(id, {
+        deviceId: getStableDeviceId(),
+        deviceName:
+          typeof window !== "undefined"
+            ? window.navigator.userAgent
+            : "Seller POS Quick Access",
+      }),
+    onSuccess: (response, variables) => {
+      setAuth(
+        response.accessToken,
+        response.refreshToken,
+        response.user,
+        response.sessionId,
+        response.posUsage || null,
+      );
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          POS_SELLER_SWITCH_FLAG_KEY,
+          POS_SELLER_SWITCH_FLAG_VALUE,
+        );
+      }
+      toast.success(`Switched to ${variables.posName}`);
+      router.push("/pos");
+    },
+    onError: (error: unknown) => {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
+        window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
+        window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
+      }
+      toast.error(asErrorMessage(error, "Failed to open selected POS"));
+    },
+  });
+
   const subscription = subscriptionQuery.data?.subscription;
   const plans = plansQuery.data?.plans || [];
   const selectedPlanDetail = plans.find((plan) => plan.code === selectedPlan);
@@ -557,6 +619,28 @@ function SellerPOSPageContent() {
       assignedUserId: editAssignedUserId.trim() || undefined,
       deviceStatus: editDeviceStatus,
     });
+  };
+
+  const launchSelectedPOS = (pos: { id: string; posName: string }) => {
+    const authState = useAuthStore.getState();
+    if (authState.user?.role !== "SELLER") {
+      toast.error("Only seller accounts can switch into POS");
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const backup = {
+        accessToken: authState.accessToken || authState.token,
+        refreshToken: authState.refreshToken,
+        user: authState.user,
+        sessionId: authState.sessionId,
+        posUsage: authState.posUsage,
+      };
+      window.sessionStorage.setItem(POS_SELLER_AUTH_BACKUP_KEY, JSON.stringify(backup));
+      window.sessionStorage.setItem(POS_SELLER_RETURN_PATH_KEY, POS_SELLER_DEFAULT_RETURN_PATH);
+    }
+
+    launchPOSMutation.mutate({ id: pos.id, posName: pos.posName });
   };
 
   return (
@@ -999,6 +1083,20 @@ function SellerPOSPageContent() {
                       <td className="px-2 py-2">{pos.activeSession?.deviceName || "-"}</td>
                       <td className="px-2 py-2">
                         <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                              launchPOSMutation.isPending ||
+                              pos.isDeactivated ||
+                              (pos.deviceStatus || "active") !== "active"
+                            }
+                            onClick={() => launchSelectedPOS({ id: pos.id, posName: pos.posName })}
+                          >
+                            {launchPOSMutation.isPending && launchPOSMutation.variables?.id === pos.id
+                              ? "Opening..."
+                              : "Open POS"}
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"

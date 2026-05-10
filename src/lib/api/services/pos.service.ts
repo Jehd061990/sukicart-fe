@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import { AuthResponse } from "@/types/auth";
 import {
   DecodeBarcodeFramePayload,
   DecodeBarcodeFrameResponse,
@@ -82,6 +83,14 @@ export const posService = {
       "/store-config/me",
       payload,
     );
+    return data;
+  },
+
+  launchPOSAccount: async (
+    id: string,
+    payload?: { deviceId?: string; deviceName?: string },
+  ) => {
+    const { data } = await apiClient.post<AuthResponse>(`/pos/${id}/launch`, payload || {});
     return data;
   },
 };

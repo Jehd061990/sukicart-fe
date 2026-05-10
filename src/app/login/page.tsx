@@ -11,6 +11,11 @@ import { useAuthStore } from "@/store/auth.store";
 import { UserRole } from "@/types/auth";
 import { InputField } from "@/components/forms/input-field";
 import { SubmitButton } from "@/components/forms/submit-button";
+import {
+  POS_SELLER_AUTH_BACKUP_KEY,
+  POS_SELLER_RETURN_PATH_KEY,
+  POS_SELLER_SWITCH_FLAG_KEY,
+} from "@/constants/pos-switch";
 import { z } from "zod";
 
 const loginFormSchema = z.object({
@@ -89,6 +94,11 @@ export default function LoginPage() {
         response.sessionId,
         response.posUsage || null,
       );
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
+        window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
+        window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
+      }
       toast.success(`Login successful. Redirecting to ${roleLabels[returnedRole]} workspace.`);
       router.push(roleRedirects[returnedRole]);
     } catch (error: unknown) {

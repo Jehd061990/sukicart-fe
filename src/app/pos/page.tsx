@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { BarcodeScannerPanel, ScannerStatusTone } from "@/components/pos/barcode-scanner-panel";
@@ -19,6 +20,13 @@ import { posService } from "@/lib/api/services/pos.service";
 import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
 import { useAuthStore } from "@/store/auth.store";
 import { usePOSCartStore } from "@/store/pos-cart.store";
+import {
+  POS_SELLER_DEFAULT_RETURN_PATH,
+  POS_SELLER_AUTH_BACKUP_KEY,
+  POS_SELLER_RETURN_PATH_KEY,
+  POS_SELLER_SWITCH_FLAG_KEY,
+  POS_SELLER_SWITCH_FLAG_VALUE,
+} from "@/constants/pos-switch";
 import { Product } from "@/types/product";
 import { ScannerMode } from "@/types/store-config";
 
@@ -102,6 +110,7 @@ const barcodeVariants = (value: string) => {
 };
 
 export default function POSPage() {
+  const router = useRouter();
   const isMobile = useIsMobile() ?? false;
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -120,6 +129,7 @@ export default function POSPage() {
   const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
 
   const role = useAuthStore((state) => state.user?.role);
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   const items = usePOSCartStore((state) => state.items);
   const addItem = usePOSCartStore((state) => state.addItem);
@@ -241,6 +251,17 @@ export default function POSPage() {
           ? "border-rose-200 bg-rose-50 text-rose-700"
           : "border-sky-200 bg-sky-50 text-sky-700";
 
+  const canBackToSeller = useMemo(() => {
+    if (typeof window === "undefined" || role !== "POS") {
+      return false;
+    }
+
+    const origin = window.sessionStorage.getItem(POS_SELLER_SWITCH_FLAG_KEY);
+    const backup = window.sessionStorage.getItem(POS_SELLER_AUTH_BACKUP_KEY);
+    const returnPath = window.sessionStorage.getItem(POS_SELLER_RETURN_PATH_KEY);
+    return origin === POS_SELLER_SWITCH_FLAG_VALUE && Boolean(backup) && Boolean(returnPath);
+  }, [role]);
+
   const addProductWithQuantity = (product: Product, quantity: number) => {
     const safeQuantity = Math.max(1, Math.min(quantity, product.stock));
     addConfiguredItem(product, {
@@ -348,6 +369,50 @@ export default function POSPage() {
     },
   });
 
+  const goBackToSeller = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const backupRaw = window.sessionStorage.getItem(POS_SELLER_AUTH_BACKUP_KEY);
+    const returnPath =
+      window.sessionStorage.getItem(POS_SELLER_RETURN_PATH_KEY) ||
+      POS_SELLER_DEFAULT_RETURN_PATH;
+    if (!backupRaw) {
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(backupRaw) as {
+        accessToken: string;
+        refreshToken: string;
+        user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>;
+        sessionId?: string | null;
+        posUsage?: ReturnType<typeof useAuthStore.getState>["posUsage"];
+      };
+
+      if (!backup.accessToken || !backup.refreshToken || !backup.user) {
+        return;
+      }
+
+      setAuth(
+        backup.accessToken,
+        backup.refreshToken,
+        backup.user,
+        backup.sessionId || null,
+        backup.posUsage || null,
+      );
+      window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
+      router.push(returnPath);
+    } catch {
+      window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
+    }
+  };
+
   if (role !== "POS") {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
@@ -377,6 +442,15 @@ export default function POSPage() {
         <section className="space-y-3">
           <div className="sticky top-0 z-20 space-y-2 rounded-2xl bg-slate-100/95 pb-2 backdrop-blur">
             <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+              {canBackToSeller ? (
+                <button
+                  type="button"
+                  onClick={goBackToSeller}
+                  className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Back to Seller
+                </button>
+              ) : null}
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Walk-in checkout</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Point of Sale</h1>
               <p className="text-sm text-slate-600">Fast cart building for front-counter checkout.</p>
