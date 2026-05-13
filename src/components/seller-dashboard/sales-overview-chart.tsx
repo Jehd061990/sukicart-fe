@@ -28,10 +28,10 @@ export function SalesOverviewChart({ plan }: SalesOverviewChartProps) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Analytics Overview</CardTitle>
       </CardHeader>
-      <CardContent className="h-[320px]">
+      <CardContent className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           {plan === "BUSINESS" ? (
-            <BarChart data={data}>
+            <BarChart data={data as any}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" />
               <YAxis />
@@ -41,7 +41,7 @@ export function SalesOverviewChart({ plan }: SalesOverviewChartProps) {
               <Bar dataKey="transfers" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
             </BarChart>
           ) : (
-            <LineChart data={data}>
+            <LineChart data={data as any}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" />
               <YAxis />
