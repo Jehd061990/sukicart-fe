@@ -9,6 +9,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const [mobileSidebarPath, setMobileSidebarPath] = useState<string | null>(null);
   const isMobileSidebarOpen = mobileSidebarPath === pathname;
+  const hideTopHeader =
+    pathname.startsWith("/pos") || pathname.startsWith("/seller/pos");
   const isMarketingRoute =
     pathname === "/" ||
     pathname.startsWith("/register") ||
@@ -27,7 +29,9 @@ export function AppShell({ children }: PropsWithChildren) {
         onMobileClose={() => setMobileSidebarPath(null)}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <AppHeader onOpenMenu={() => setMobileSidebarPath(pathname)} />
+        {!hideTopHeader ? (
+          <AppHeader onOpenMenu={() => setMobileSidebarPath(pathname)} />
+        ) : null}
         <main className="flex-1 overflow-y-auto p-3 md:p-6">{children}</main>
       </div>
     </div>
