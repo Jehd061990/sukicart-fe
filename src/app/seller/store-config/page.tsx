@@ -4,10 +4,43 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImageUploadDropzone } from "@/components/uploads/ImageUploadDropzone";
 import { posService } from "@/lib/api/services/pos.service";
-import { ScannerMode, StoreType } from "@/types/store-config";
+import {
+  CategoryThumbnailShape,
+  ScannerMode,
+  StoreCategoryImage,
+  StoreCategoryKey,
+  StoreType,
+} from "@/types/store-config";
 
 const SCANNER_MODES: ScannerMode[] = ["hardware", "camera", "manual"];
+const CATEGORY_KEYS: StoreCategoryKey[] = ["vegetables", "meat", "fish"];
+const CATEGORY_DEFAULT_LABELS: Record<StoreCategoryKey, string> = {
+  vegetables: "Vegetables",
+  meat: "Meat",
+  fish: "Fish",
+};
+
+const normalizeCategoryCatalog = (
+  input: Array<{
+    key?: string;
+    label?: string;
+    image?: string;
+    images?: StoreCategoryImage[];
+  }> = [],
+) =>
+  CATEGORY_KEYS.map((key) => {
+    const existing = input.find((entry) => entry?.key === key);
+    const images = Array.isArray(existing?.images) ? existing.images : [];
+
+    return {
+      key,
+      label: String(existing?.label || CATEGORY_DEFAULT_LABELS[key]),
+      image: String(existing?.image || images[0]?.url || ""),
+      images,
+    };
+  });
 
 const ensureValidScannerMode = (
   selectedModes: ScannerMode[],
@@ -47,6 +80,13 @@ export default function SellerStoreConfigPage() {
     maxLineItems: number;
     scannerModes: ScannerMode[];
     defaultScannerMode: ScannerMode;
+    categoryThumbnailShape: CategoryThumbnailShape;
+    categoryCatalog: Array<{
+      key: StoreCategoryKey;
+      label: string;
+      image: string;
+      images: StoreCategoryImage[];
+    }>;
   } | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -74,6 +114,11 @@ export default function SellerStoreConfigPage() {
         ? config.uiBehavior.scannerModes
         : ["manual"],
       defaultScannerMode: config.uiBehavior.defaultScannerMode || "manual",
+      categoryThumbnailShape:
+        config.uiBehavior.categoryThumbnailShape === "circle"
+          ? "circle"
+          : "rounded",
+      categoryCatalog: normalizeCategoryCatalog(config.uiBehavior.categoryCatalog),
     };
   }, [storeConfigQuery.data]);
 
@@ -105,6 +150,13 @@ export default function SellerStoreConfigPage() {
             showBulkQuantityActions: Boolean(form?.bulkQuantityInput),
             scannerModes: scanner.modes,
             defaultScannerMode: scanner.defaultMode,
+            categoryThumbnailShape: form?.categoryThumbnailShape || "rounded",
+            categoryCatalog: (form?.categoryCatalog || []).map((entry) => ({
+              key: entry.key,
+              label: String(entry.label || CATEGORY_DEFAULT_LABELS[entry.key]).trim(),
+              image: String(entry.image || entry.images?.[0]?.url || ""),
+              images: Array.isArray(entry.images) ? entry.images : [],
+            })),
           },
         },
       });
@@ -165,6 +217,28 @@ export default function SellerStoreConfigPage() {
     updateDraft({
       scannerModes: scanner.modes,
       defaultScannerMode: scanner.defaultMode,
+    });
+  };
+
+  const updateCategoryCatalog = (
+    key: StoreCategoryKey,
+    next: Partial<{
+      label: string;
+      image: string;
+      images: StoreCategoryImage[];
+    }>,
+  ) => {
+    updateDraft({
+      categoryCatalog: form.categoryCatalog.map((entry) => {
+        if (entry.key !== key) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          ...next,
+        };
+      }),
     });
   };
 
@@ -325,6 +399,65 @@ export default function SellerStoreConfigPage() {
             </option>
           ))}
         </select>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Category Thumbnail Style</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Choose how category thumbnail chips appear in POS tabs and side menu.
+        </p>
+
+        <label className="mb-2 block text-sm font-medium">Shape</label>
+        <select
+          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          value={form.categoryThumbnailShape}
+          onChange={(event) =>
+            updateDraft({
+              categoryThumbnailShape: event.target.value as CategoryThumbnailShape,
+            })
+          }
+        >
+          <option value="rounded">Rounded square</option>
+          <option value="circle">Circle</option>
+        </select>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Category Images</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Upload one optimized image per category for POS and inventory visuals.
+        </p>
+
+        <div className="space-y-4">
+          {form.categoryCatalog.map((entry) => (
+            <div key={entry.key} className="rounded-xl border p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold capitalize">{entry.key}</p>
+                <Input
+                  className="max-w-xs"
+                  value={entry.label}
+                  onChange={(event) =>
+                    updateCategoryCatalog(entry.key, { label: event.target.value })
+                  }
+                  placeholder="Category label"
+                />
+              </div>
+
+              <ImageUploadDropzone
+                value={entry.images}
+                onChange={(nextImages) =>
+                  updateCategoryCatalog(entry.key, {
+                    images: nextImages.slice(0, 1),
+                    image: nextImages[0]?.url || "",
+                  })
+                }
+                folder={`sukigo/categories/${entry.key}`}
+                maxFiles={1}
+                previewShape={form.categoryThumbnailShape}
+              />
+            </div>
+          ))}
+        </div>
       </article>
 
       <Button

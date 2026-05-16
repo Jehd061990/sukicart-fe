@@ -14,6 +14,7 @@ import { DiscountModal } from "@/components/pos/DiscountModal";
 import { ProductCard } from "@/components/pos/ProductCard";
 import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { normalizeProductImageUrl } from "@/lib/images/product-image";
 import { cacheProducts, getCachedProductsPayload } from "@/lib/offline/products-cache";
 import { productService } from "@/lib/api/services/product.service";
 import { posService } from "@/lib/api/services/pos.service";
@@ -160,6 +161,45 @@ export default function POSPage() {
   const storeConfig = storeConfigQuery.data?.config;
   const barcodeEnabled = Boolean(storeConfig?.features?.barcodeScanning);
   const showBarcodeScannerPanel = Boolean(storeConfig?.uiBehavior?.showBarcodeScanner);
+  const categoryLabelByKey = useMemo(() => {
+    const catalog = Array.isArray(storeConfig?.uiBehavior?.categoryCatalog)
+      ? storeConfig.uiBehavior.categoryCatalog
+      : [];
+
+    return catalog.reduce<Record<string, string>>((acc, entry) => {
+      const key = String(entry?.key || "").trim().toLowerCase();
+      const label = String(entry?.label || "").trim();
+
+      if (key && label) {
+        acc[key] = label;
+      }
+
+      return acc;
+    }, {});
+  }, [storeConfig?.uiBehavior?.categoryCatalog]);
+  const categoryThumbnailByKey = useMemo(() => {
+    const catalog = Array.isArray(storeConfig?.uiBehavior?.categoryCatalog)
+      ? storeConfig.uiBehavior.categoryCatalog
+      : [];
+
+    return catalog.reduce<Record<string, string>>((acc, entry) => {
+      const key = String(entry?.key || "").trim().toLowerCase();
+      const imageFromAsset = entry?.images?.[0]?.thumbnailUrl || entry?.images?.[0]?.url;
+      const image = normalizeProductImageUrl(imageFromAsset || entry?.image || "");
+
+      if (key && image) {
+        acc[key] = image;
+      }
+
+      return acc;
+    }, {});
+  }, [storeConfig?.uiBehavior?.categoryCatalog]);
+  const categoryThumbnailShape =
+    storeConfig?.uiBehavior?.categoryThumbnailShape === "circle"
+      ? "circle"
+      : "rounded";
+  const categoryThumbClassName =
+    categoryThumbnailShape === "circle" ? "rounded-full" : "rounded-md";
 
   const allowedScannerModes = useMemo<ScannerMode[]>(() => {
     const configuredModes = storeConfig?.uiBehavior?.scannerModes || [];
@@ -431,16 +471,16 @@ export default function POSPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-100 pb-24 md:pb-6">
+    <div className="relative min-h-screen bg-slate-100 pb-24 md:min-h-full md:pb-6">
       {flashMessage ? (
         <div className="fixed right-4 top-4 z-50 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-lg transition">
           {flashMessage}
         </div>
       ) : null}
 
-      <div className="mx-auto grid max-w-7xl gap-4 p-3 md:grid-cols-[1fr_360px] md:p-4">
+      <div className="mx-auto grid max-w-screen-2xl gap-4 p-3 md:grid-cols-[minmax(0,1fr)_360px] md:p-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="space-y-3">
-          <div className="sticky top-0 z-20 space-y-2 rounded-2xl bg-slate-100/95 pb-2 backdrop-blur">
+          <div className="sticky top-0 z-20 space-y-2 rounded-2xl bg-slate-100/95 pb-2 backdrop-blur md:top-1">
             <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
               {canBackToSeller ? (
                 <button
@@ -472,11 +512,16 @@ export default function POSPage() {
               />
             </div>
 
-            <CategoryTabs
-              categories={categories}
-              activeCategory={activeCategory}
-              onChange={setCategory}
-            />
+            <div className="xl:hidden">
+              <CategoryTabs
+                categories={categories}
+                activeCategory={activeCategory}
+                onChange={setCategory}
+                labelByCategory={categoryLabelByKey}
+                thumbnailByCategory={categoryThumbnailByKey}
+                thumbnailShape={categoryThumbnailShape}
+              />
+            </div>
 
             {barcodeEnabled && showBarcodeScannerPanel && isMobile ? (
               <Link
@@ -517,50 +562,104 @@ export default function POSPage() {
             ) : null}
           </div>
 
-          {productsQuery.isLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-52 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200"
-                />
-              ))}
+          <div className="grid gap-3 xl:grid-cols-[200px_minmax(0,1fr)] xl:items-start">
+            <aside className="hidden xl:block">
+              <div className="sticky top-28 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
+                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Menu Categories
+                </p>
+                <div className="space-y-1">
+                  {categories.map((cat) => {
+                    const isActive = activeCategory === cat;
+
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCategory(cat)}
+                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
+                          isActive
+                            ? "bg-slate-900 text-white"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {cat !== "all" && categoryThumbnailByKey[cat] ? (
+                          <img
+                            src={categoryThumbnailByKey[cat]}
+                            alt={categoryLabelByKey[cat] || cat}
+                            className={`h-6 w-6 object-cover ring-1 ring-black/10 ${categoryThumbClassName}`}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span
+                            className={`inline-flex h-6 w-6 items-center justify-center text-[10px] font-bold uppercase ${categoryThumbClassName} ${
+                              isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                            }`}
+                          >
+                            {cat === "all"
+                              ? "All"
+                              : (categoryLabelByKey[cat] || cat).slice(0, 2)}
+                          </span>
+                        )}
+                        <span>
+                          {cat === "all"
+                            ? "All Items"
+                            : categoryLabelByKey[cat] || cat}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
+
+            <div>
+              {productsQuery.isLoading ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="h-52 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200"
+                    />
+                  ))}
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500 ring-1 ring-slate-200">
+                  No products match your filters.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+                  {filteredProducts.map((product) => (
+                    <ProductCard
+                      key={product._id}
+                      product={product}
+                      highlight={highlightProductId === product._id}
+                      onQuickAdd={(pickedProduct) => {
+                        addItem(pickedProduct);
+                        triggerAddedFeedback(pickedProduct.name, pickedProduct._id);
+                      }}
+                      onOpenDetails={(pickedProduct) => {
+                        setDetailsProduct(pickedProduct);
+                        setDetailsQuantity(1);
+                        setDetailsNote("");
+                        setDetailsVariant("Regular");
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500 ring-1 ring-slate-200">
-              No products match your filters.
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product._id}
-                  product={product}
-                  highlight={highlightProductId === product._id}
-                  onQuickAdd={(pickedProduct) => {
-                    addItem(pickedProduct);
-                    triggerAddedFeedback(pickedProduct.name, pickedProduct._id);
-                  }}
-                  onOpenDetails={(pickedProduct) => {
-                    setDetailsProduct(pickedProduct);
-                    setDetailsQuantity(1);
-                    setDetailsNote("");
-                    setDetailsVariant("Regular");
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          </div>
         </section>
 
-        <aside className="hidden h-fit space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:block">
+        <aside className="hidden self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:sticky md:top-4 md:flex md:max-h-[calc(100dvh-7.5rem)] md:flex-col">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Current Cart</h2>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
               {itemCount} items
             </span>
           </div>
-          <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
+          <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {items.length === 0 ? (
               <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
                 Cart is empty.
@@ -578,7 +677,7 @@ export default function POSPage() {
             )}
           </div>
 
-          <div className="space-y-2 border-t border-slate-200 pt-3">
+          <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
             <div className="flex items-center justify-between text-sm text-slate-600">
               <span>Subtotal</span>
               <span>PHP {subtotal.toFixed(2)}</span>

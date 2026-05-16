@@ -21,6 +21,16 @@ const nextConfig: NextConfig = {
         hostname: "cdn.store-assets.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ever.ph",
+        pathname: "/**",
+      },
     ],
   },
 };

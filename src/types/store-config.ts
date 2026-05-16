@@ -6,6 +6,24 @@ export type StoreType =
   | "retail";
 
 export type ScannerMode = "camera" | "hardware" | "manual";
+export type StoreCategoryKey = "vegetables" | "meat" | "fish";
+export type CategoryThumbnailShape = "circle" | "rounded";
+
+export interface StoreCategoryImage {
+  url: string;
+  publicId: string;
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  format: string;
+}
+
+export interface StoreCategoryVisual {
+  key: StoreCategoryKey;
+  label: string;
+  image?: string;
+  images?: StoreCategoryImage[];
+}
 
 export interface StoreConfigFeatures {
   barcodeScanning: boolean;
@@ -20,6 +38,8 @@ export interface StoreConfigUIBehavior {
   showBulkQuantityActions: boolean;
   scannerModes: ScannerMode[];
   defaultScannerMode: ScannerMode;
+  categoryCatalog?: StoreCategoryVisual[];
+  categoryThumbnailShape?: CategoryThumbnailShape;
 }
 
 export interface StoreConfigBusinessRules {

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { productService } from "@/lib/api/services/product.service";
+import { resolveProductFullImageUrl } from "@/lib/images/product-image";
 import { useCartStore } from "@/store/cart.store";
 import { Product, ProductCategory } from "@/types/product";
 import { ProductCard } from "@/components/buyer/product-card";
@@ -56,7 +57,7 @@ export function StorefrontGrid() {
       productId: product._id,
       name: product.name,
       price: product.price,
-      image: product.image,
+      image: resolveProductFullImageUrl(product),
     });
   };
 
@@ -69,7 +70,7 @@ export function StorefrontGrid() {
       productId: selectedProduct._id,
       name: selectedProduct.name,
       price: selectedProduct.price,
-      image: selectedProduct.image,
+      image: resolveProductFullImageUrl(selectedProduct),
     });
 
     for (let i = 1; i < selectedQuantity; i += 1) {
@@ -83,9 +84,10 @@ export function StorefrontGrid() {
     () => Array.from({ length: 8 }, (_, index) => ({ id: index })),
     [],
   );
-  const isSelectedImageExternal = /^https?:\/\//i.test(
-    selectedProduct?.image ?? "",
-  );
+  const selectedImageUrl = selectedProduct
+    ? resolveProductFullImageUrl(selectedProduct)
+    : "";
+  const isSelectedImageExternal = /^https?:\/\//i.test(selectedImageUrl);
 
   return (
     <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
@@ -190,21 +192,22 @@ export function StorefrontGrid() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="h-64 overflow-hidden rounded-lg border bg-muted">
-                {selectedProduct.image ? (
+                {selectedImageUrl ? (
                   isSelectedImageExternal ? (
                     <img
-                      src={selectedProduct.image}
+                      src={selectedImageUrl}
                       alt={selectedProduct.name}
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />
                   ) : (
                     <Image
-                      src={selectedProduct.image}
+                      src={selectedImageUrl}
                       alt={selectedProduct.name}
                       width={1024}
                       height={640}
                       className="h-full w-full object-cover"
+                      loading="lazy"
                     />
                   )
                 ) : (

@@ -2,6 +2,15 @@ export type ProductCategory = "vegetables" | "meat" | "fish";
 export type ProductUnit = "kg" | "pcs";
 export type ProductStatus = "active" | "inactive";
 
+export interface ProductImageAsset {
+  url: string;
+  publicId: string;
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  format: string;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -16,6 +25,7 @@ export interface Product {
     | string
     | { _id: string; name?: string; email?: string; role?: string };
   image?: string;
+  images?: ProductImageAsset[];
   description?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -51,6 +61,7 @@ export interface CreateProductPayload {
   category: ProductCategory;
   status?: ProductStatus;
   image?: string;
+  images?: ProductImageAsset[];
 }
 
 export type UpdateProductPayload = Partial<CreateProductPayload>;

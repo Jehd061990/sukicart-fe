@@ -19,6 +19,8 @@ import {
   ProductStatus,
   ProductUnit,
 } from "@/types/product";
+import { LazyInventoryImage } from "@/components/images/lazy-inventory-image";
+import { SukiGoImageUploader } from "@/components/uploads/sukigo-image-uploader";
 
 const CATEGORY_OPTIONS: ProductCategory[] = ["vegetables", "meat", "fish"];
 const UNIT_OPTIONS: ProductUnit[] = ["kg", "pcs"];
@@ -34,6 +36,7 @@ const INITIAL_FORM: CreateProductPayload = {
   category: "vegetables",
   status: "active",
   image: "",
+  images: [],
 };
 
 export function ProductManagement() {
@@ -121,6 +124,7 @@ export function ProductManagement() {
       category: product.category,
       status: product.status,
       image: product.image || "",
+      images: product.images || [],
     });
     setIsModalOpen(true);
   };
@@ -141,6 +145,17 @@ export function ProductManagement() {
 
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
+      {
+        header: "Image",
+        cell: ({ row }) => (
+          <LazyInventoryImage
+            name={row.original.name}
+            image={row.original.image}
+            images={row.original.images}
+            size={52}
+          />
+        ),
+      },
       { header: "Name", accessorKey: "name" },
       {
         header: "Price",
@@ -262,13 +277,13 @@ export function ProductManagement() {
           <tbody>
             {productsQuery.isLoading ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={8}>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={9}>
                   Loading products...
                 </td>
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={8}>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={9}>
                   No products found.
                 </td>
               </tr>
@@ -450,17 +465,22 @@ export function ProductManagement() {
                   ))}
                 </select>
 
-                <Input
-                  placeholder="Image URL (optional)"
-                  value={formValues.image || ""}
-                  onChange={(event) =>
-                    setFormValues((state) => ({
-                      ...state,
-                      image: event.target.value,
-                    }))
-                  }
-                />
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  First uploaded image is used as primary thumbnail.
+                </div>
               </div>
+
+              <SukiGoImageUploader
+                value={formValues.images || []}
+                folder={`sukigo/products/${formValues.category}`}
+                onChange={(nextImages) =>
+                  setFormValues((state) => ({
+                    ...state,
+                    images: nextImages,
+                    image: nextImages[0]?.url || "",
+                  }))
+                }
+              />
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { resolveProductThumbnailUrl } from "@/lib/images/product-image";
 import { Product } from "@/types/product";
 
 interface ProductCardProps {
@@ -32,7 +33,8 @@ export function ProductCard({
 }: ProductCardProps) {
   const [isAdding, setIsAdding] = useState(false);
   const stockMeta = getStockMeta(product.stock);
-  const isExternalImage = /^https?:\/\//i.test(product.image ?? "");
+  const thumbnailUrl = resolveProductThumbnailUrl(product);
+  const isExternalImage = /^https?:\/\//i.test(thumbnailUrl);
 
   const handleAddToCart = async () => {
     if (product.stock <= 0 || isAdding) {
@@ -56,21 +58,22 @@ export function ProductCard({
         onClick={() => onViewDetails(product)}
       >
         <div className="h-36 w-full overflow-hidden bg-muted">
-          {product.image ? (
+          {thumbnailUrl ? (
             isExternalImage ? (
               <img
-                src={product.image}
+                src={thumbnailUrl}
                 alt={product.name}
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
               />
             ) : (
               <Image
-                src={product.image}
+                src={thumbnailUrl}
                 alt={product.name}
                 width={512}
                 height={288}
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
               />
             )
           ) : (

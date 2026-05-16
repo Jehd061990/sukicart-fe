@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LazyInventoryImage } from "@/components/images/lazy-inventory-image";
 import { inventoryService } from "@/lib/api/services/inventory.service";
 
 export default function SellerInventorySyncPage() {
@@ -85,12 +86,38 @@ export default function SellerInventorySyncPage() {
             </tr>
           </thead>
           <tbody>
+            {inventoryQuery.isLoading
+              ? Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={`skeleton-${index}`} className="border-b">
+                    <td className="px-3 py-2" colSpan={6}>
+                      <div className="h-9 animate-pulse rounded-md bg-slate-100" />
+                    </td>
+                  </tr>
+                ))
+              : null}
+            {!inventoryQuery.isLoading && rows.length === 0 ? (
+              <tr>
+                <td className="px-3 py-4 text-sm text-slate-500" colSpan={6}>
+                  No inventory records found.
+                </td>
+              </tr>
+            ) : null}
             {rows.map((row) => {
               const draft = stockDraftByProductId[row.productId] ?? String(row.stock);
 
               return (
                 <tr key={row.id} className="border-b">
-                  <td className="px-3 py-2">{row.product?.name || "Unknown"}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <LazyInventoryImage
+                        name={row.product?.name || "Unknown"}
+                        image={row.product?.image}
+                        images={row.product?.images}
+                        size={42}
+                      />
+                      <span>{row.product?.name || "Unknown"}</span>
+                    </div>
+                  </td>
                   <td className="px-3 py-2">{row.product?.category || "-"}</td>
                   <td className="px-3 py-2">{row.product?.unit || "-"}</td>
                   <td className="px-3 py-2">{row.stock}</td>
