@@ -6,7 +6,18 @@ const DEFAULT_API_BASE_URL =
     ? "http://localhost:5000/api"
     : "https://sukicart-be.onrender.com/api";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
+const normalizeApiBaseUrl = (value: string) => {
+  const trimmed = String(value || "").trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    return DEFAULT_API_BASE_URL;
+  }
+
+  return /\/api$/i.test(trimmed) ? trimmed : `${trimmed}/api`;
+};
+
+const BASE_URL = normalizeApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL,
+);
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

@@ -9,6 +9,7 @@ import { InputField } from "@/components/forms/input-field";
 import { TextArea } from "@/components/forms/text-area";
 import { SubmitButton } from "@/components/forms/submit-button";
 import { buyerService } from "@/lib/api/services/buyer.service";
+import { useAuthStore } from "@/store/auth.store";
 import {
   BuyerRegistrationFormValues,
   buyerRegistrationSchema,
@@ -16,6 +17,7 @@ import {
 
 export default function RegisterBuyerPage() {
   const router = useRouter();
+  const setAuth = useAuthStore((state) => state.setAuth);
 
   const {
     register,
@@ -39,7 +41,16 @@ export default function RegisterBuyerPage() {
 
   const onSubmit = async (values: BuyerRegistrationFormValues) => {
     try {
-      await buyerService.register(values);
+      const response = await buyerService.register(values);
+      if (response.accessToken && response.refreshToken && response.user) {
+        setAuth(
+          response.accessToken,
+          response.refreshToken,
+          response.user,
+          response.sessionId || null,
+          null,
+        );
+      }
       toast.success("Welcome! Start shopping now.");
       router.push("/buyer/home");
     } catch (error: unknown) {
