@@ -2,14 +2,22 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronsLeft, ChevronsRight, LogOut, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowLeft, ChevronsLeft, ChevronsRight, LogOut, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getNavItemsByRole, ROLE_MODULES } from "@/config/navigation";
 import { authService } from "@/lib/api/services/auth.service";
 import { useAuthStore } from "@/store/auth.store";
 import { Button } from "@/components/ui/button";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { cn } from "@/lib/utils";
+import {
+  POS_SELLER_AUTH_BACKUP_KEY,
+  POS_SELLER_DEFAULT_RETURN_PATH,
+  POS_SELLER_RETURN_PATH_KEY,
+  POS_SELLER_SWITCH_FLAG_KEY,
+  POS_SELLER_SWITCH_FLAG_VALUE,
+} from "@/constants/pos-switch";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sukigo:sidebar-collapsed";
 
@@ -53,6 +61,7 @@ export function AppSidebar({
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.user?.role);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
   const inferredRole = ROLE_MODULES.find((moduleConfig) =>
@@ -60,6 +69,16 @@ export function AppSidebar({
   )?.role;
 
   const navItems = getNavItemsByRole(role ?? inferredRole ?? null);
+  const canBackToSeller = useMemo(() => {
+    if (typeof window === "undefined" || role !== "POS") {
+      return false;
+    }
+
+    const origin = window.sessionStorage.getItem(POS_SELLER_SWITCH_FLAG_KEY);
+    const backup = window.sessionStorage.getItem(POS_SELLER_AUTH_BACKUP_KEY);
+    const returnPath = window.sessionStorage.getItem(POS_SELLER_RETURN_PATH_KEY);
+    return origin === POS_SELLER_SWITCH_FLAG_VALUE && Boolean(backup) && Boolean(returnPath);
+  }, [role]);
 
   const handleLogout = async () => {
     try {
@@ -73,6 +92,52 @@ export function AppSidebar({
       toast.success("Logged out successfully");
       router.push("/login");
       onMobileClose?.();
+    }
+  };
+
+  const handleBackToSeller = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const backupRaw = window.sessionStorage.getItem(POS_SELLER_AUTH_BACKUP_KEY);
+    const returnPath =
+      window.sessionStorage.getItem(POS_SELLER_RETURN_PATH_KEY) ||
+      POS_SELLER_DEFAULT_RETURN_PATH;
+
+    if (!backupRaw) {
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(backupRaw) as {
+        accessToken: string;
+        refreshToken: string;
+        user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>;
+        sessionId?: string | null;
+        posUsage?: ReturnType<typeof useAuthStore.getState>["posUsage"];
+      };
+
+      if (!backup.accessToken || !backup.refreshToken || !backup.user) {
+        return;
+      }
+
+      setAuth(
+        backup.accessToken,
+        backup.refreshToken,
+        backup.user,
+        backup.sessionId || null,
+        backup.posUsage || null,
+      );
+      window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
+      router.push(returnPath);
+      onMobileClose?.();
+    } catch {
+      window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
+      window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
     }
   };
 
@@ -124,33 +189,48 @@ export function AppSidebar({
         )}
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
+      <SimplebarScroll className="min-h-0 flex-1 pr-1" contentClassName="space-y-1">
+        <nav>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onMobileClose}
-              title={isCollapsed ? item.label : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition",
-                isCollapsed && "justify-center px-2",
-                isActive
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {!isCollapsed ? <span>{item.label}</span> : null}
-            </Link>
-          );
-        })}
-      </nav>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onMobileClose}
+                title={isCollapsed ? item.label : undefined}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition",
+                  isCollapsed && "justify-center px-2",
+                  isActive
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {!isCollapsed ? <span>{item.label}</span> : null}
+              </Link>
+            );
+          })}
+        </nav>
+      </SimplebarScroll>
 
       <div className="mt-auto border-t pt-4">
+        {canBackToSeller ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className={cn("mb-2 w-full gap-2", isCollapsed ? "justify-center" : "justify-start")}
+            onClick={handleBackToSeller}
+            title={isCollapsed ? "Back to Seller" : undefined}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {!isCollapsed ? "Back to Seller" : null}
+          </Button>
+        ) : null}
+
         <Button
           type="button"
           variant="outline"

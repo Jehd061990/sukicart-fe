@@ -4,11 +4,13 @@ import { PropsWithChildren, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 
 export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const [mobileSidebarPath, setMobileSidebarPath] = useState<string | null>(null);
   const isMobileSidebarOpen = mobileSidebarPath === pathname;
+  const isPOSRoute = pathname.startsWith("/pos");
   const hideTopHeader =
     pathname.startsWith("/pos") || pathname.startsWith("/seller/pos");
   const isMarketingRoute =
@@ -32,7 +34,9 @@ export function AppShell({ children }: PropsWithChildren) {
         {!hideTopHeader ? (
           <AppHeader onOpenMenu={() => setMobileSidebarPath(pathname)} />
         ) : null}
-        <main className="flex-1 overflow-y-auto p-3 md:p-6">{children}</main>
+        <main className={`flex-1 overflow-hidden ${isPOSRoute ? "p-0" : "p-3 md:p-6"}`}>
+          {isPOSRoute ? children : <SimplebarScroll className="h-full">{children}</SimplebarScroll>}
+        </main>
       </div>
     </div>
   );

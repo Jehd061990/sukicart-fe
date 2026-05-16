@@ -2,16 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { BarcodeScannerPanel, ScannerStatusTone } from "@/components/pos/barcode-scanner-panel";
 import { CartBar } from "@/components/pos/CartBar";
 import { CartItem } from "@/components/pos/CartItem";
-import { CategoryTabs } from "@/components/pos/CategoryTabs";
 import { CheckoutModal } from "@/components/pos/CheckoutModal";
 import { DiscountModal } from "@/components/pos/DiscountModal";
 import { ProductCard } from "@/components/pos/ProductCard";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { Input } from "@/components/ui/input";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { normalizeProductImageUrl } from "@/lib/images/product-image";
@@ -21,13 +20,6 @@ import { posService } from "@/lib/api/services/pos.service";
 import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
 import { useAuthStore } from "@/store/auth.store";
 import { usePOSCartStore } from "@/store/pos-cart.store";
-import {
-  POS_SELLER_DEFAULT_RETURN_PATH,
-  POS_SELLER_AUTH_BACKUP_KEY,
-  POS_SELLER_RETURN_PATH_KEY,
-  POS_SELLER_SWITCH_FLAG_KEY,
-  POS_SELLER_SWITCH_FLAG_VALUE,
-} from "@/constants/pos-switch";
 import { Product } from "@/types/product";
 import { ScannerMode } from "@/types/store-config";
 
@@ -111,7 +103,6 @@ const barcodeVariants = (value: string) => {
 };
 
 export default function POSPage() {
-  const router = useRouter();
   const isMobile = useIsMobile() ?? false;
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -128,9 +119,9 @@ export default function POSPage() {
   const [detailsNote, setDetailsNote] = useState("");
   const [detailsVariant, setDetailsVariant] = useState("Regular");
   const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
+  const [showScannerPanel, setShowScannerPanel] = useState(true);
 
   const role = useAuthStore((state) => state.user?.role);
-  const setAuth = useAuthStore((state) => state.setAuth);
 
   const items = usePOSCartStore((state) => state.items);
   const addItem = usePOSCartStore((state) => state.addItem);
@@ -291,17 +282,6 @@ export default function POSPage() {
           ? "border-rose-200 bg-rose-50 text-rose-700"
           : "border-sky-200 bg-sky-50 text-sky-700";
 
-  const canBackToSeller = useMemo(() => {
-    if (typeof window === "undefined" || role !== "POS") {
-      return false;
-    }
-
-    const origin = window.sessionStorage.getItem(POS_SELLER_SWITCH_FLAG_KEY);
-    const backup = window.sessionStorage.getItem(POS_SELLER_AUTH_BACKUP_KEY);
-    const returnPath = window.sessionStorage.getItem(POS_SELLER_RETURN_PATH_KEY);
-    return origin === POS_SELLER_SWITCH_FLAG_VALUE && Boolean(backup) && Boolean(returnPath);
-  }, [role]);
-
   const addProductWithQuantity = (product: Product, quantity: number) => {
     const safeQuantity = Math.max(1, Math.min(quantity, product.stock));
     addConfiguredItem(product, {
@@ -409,50 +389,6 @@ export default function POSPage() {
     },
   });
 
-  const goBackToSeller = () => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const backupRaw = window.sessionStorage.getItem(POS_SELLER_AUTH_BACKUP_KEY);
-    const returnPath =
-      window.sessionStorage.getItem(POS_SELLER_RETURN_PATH_KEY) ||
-      POS_SELLER_DEFAULT_RETURN_PATH;
-    if (!backupRaw) {
-      return;
-    }
-
-    try {
-      const backup = JSON.parse(backupRaw) as {
-        accessToken: string;
-        refreshToken: string;
-        user: NonNullable<ReturnType<typeof useAuthStore.getState>["user"]>;
-        sessionId?: string | null;
-        posUsage?: ReturnType<typeof useAuthStore.getState>["posUsage"];
-      };
-
-      if (!backup.accessToken || !backup.refreshToken || !backup.user) {
-        return;
-      }
-
-      setAuth(
-        backup.accessToken,
-        backup.refreshToken,
-        backup.user,
-        backup.sessionId || null,
-        backup.posUsage || null,
-      );
-      window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
-      window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
-      window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
-      router.push(returnPath);
-    } catch {
-      window.sessionStorage.removeItem(POS_SELLER_AUTH_BACKUP_KEY);
-      window.sessionStorage.removeItem(POS_SELLER_RETURN_PATH_KEY);
-      window.sessionStorage.removeItem(POS_SELLER_SWITCH_FLAG_KEY);
-    }
-  };
-
   if (role !== "POS") {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
@@ -471,195 +407,177 @@ export default function POSPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-100 pb-24 md:min-h-full md:pb-6">
+    <div className="relative h-full overflow-hidden bg-slate-100 pb-24 md:pb-0">
       {flashMessage ? (
         <div className="fixed right-4 top-4 z-50 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-lg transition">
           {flashMessage}
         </div>
       ) : null}
 
-      <div className="mx-auto grid max-w-screen-2xl gap-4 p-3 md:grid-cols-[minmax(0,1fr)_360px] md:p-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <section className="space-y-3">
+      <div className="grid h-full p-3 gap-4 md:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
+        <section className="flex min-h-0 flex-col gap-3">
           <div className="sticky top-0 z-20 space-y-2 rounded-2xl bg-slate-100/95 pb-2 backdrop-blur md:top-1">
-            <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
-              {canBackToSeller ? (
-                <button
-                  type="button"
-                  onClick={goBackToSeller}
-                  className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  Back to Seller
-                </button>
-              ) : null}
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Walk-in checkout</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Point of Sale</h1>
-              <p className="text-sm text-slate-600">Fast cart building for front-counter checkout.</p>
-              <Input
-                autoFocus
-                className="mt-3 h-11 border-slate-200 bg-slate-50 text-base focus-visible:border-brand-500 focus-visible:ring-brand-100"
-                placeholder="Search products or scan barcode"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") {
-                    return;
-                  }
+            <div className="space-y-1 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+              {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Walk-in checkout
+              </p> */}
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+                Point of Sale
+              </h1>
+              <p className="text-sm text-slate-600">
+                Fast cart building for front-counter checkout.
+              </p>
 
-                  if (addProductByBarcode(search)) {
-                    setSearch("");
-                  }
-                }}
-              />
-            </div>
+              <div className="mt-1 grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+                <Input
+                  autoFocus
+                  className="h-11 border-slate-200 bg-slate-50 text-base focus-visible:border-brand-500 focus-visible:ring-brand-100"
+                  placeholder="Search products or scan barcode"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") {
+                      return;
+                    }
 
-            <div className="xl:hidden">
-              <CategoryTabs
-                categories={categories}
-                activeCategory={activeCategory}
-                onChange={setCategory}
-                labelByCategory={categoryLabelByKey}
-                thumbnailByCategory={categoryThumbnailByKey}
-                thumbnailShape={categoryThumbnailShape}
-              />
-            </div>
-
-            {barcodeEnabled && showBarcodeScannerPanel && isMobile ? (
-              <Link
-                href="/scanner"
-                className="flex h-12 items-center justify-center rounded-2xl bg-brand-600 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-              >
-                Scan Item
-              </Link>
-            ) : null}
-
-            {barcodeEnabled && showBarcodeScannerPanel && !isMobile ? (
-              <div className="rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-                <div
-                  className={`mb-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${scannerStatusClassName}`}
-                >
-                  {scannerStatus}
-                </div>
-                <BarcodeScannerPanel
-                  modes={allowedScannerModes}
-                  defaultMode={defaultScannerMode}
-                  barcodeValue={barcodeInput}
-                  onBarcodeValueChange={setBarcodeInput}
-                  onBarcodeSubmit={addProductByBarcode}
-                  onServerFrameDecode={async (imageData) => {
-                    try {
-                      const result = await posService.decodeBarcodeFrame({ imageData });
-                      return result.barcode || null;
-                    } catch {
-                      return null;
+                    if (addProductByBarcode(search)) {
+                      setSearch("");
                     }
                   }}
-                  onStatusChange={(status, tone = "info") => {
-                    setScannerStatus(status);
-                    setScannerStatusTone(tone);
-                  }}
                 />
-              </div>
-            ) : null}
-          </div>
-
-          <div className="grid gap-3 xl:grid-cols-[200px_minmax(0,1fr)] xl:items-start">
-            <aside className="hidden xl:block">
-              <div className="sticky top-28 rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
-                <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Menu Categories
-                </p>
-                <div className="space-y-1">
-                  {categories.map((cat) => {
-                    const isActive = activeCategory === cat;
-
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setCategory(cat)}
-                        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
-                          isActive
-                            ? "bg-slate-900 text-white"
-                            : "text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        {cat !== "all" && categoryThumbnailByKey[cat] ? (
-                          <img
-                            src={categoryThumbnailByKey[cat]}
-                            alt={categoryLabelByKey[cat] || cat}
-                            className={`h-6 w-6 object-cover ring-1 ring-black/10 ${categoryThumbClassName}`}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <span
-                            className={`inline-flex h-6 w-6 items-center justify-center text-[10px] font-bold uppercase ${categoryThumbClassName} ${
-                              isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {cat === "all"
-                              ? "All"
-                              : (categoryLabelByKey[cat] || cat).slice(0, 2)}
-                          </span>
-                        )}
-                        <span>
-                          {cat === "all"
-                            ? "All Items"
-                            : categoryLabelByKey[cat] || cat}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </aside>
-
-            <div>
-              {productsQuery.isLoading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, index) => (
-                    <div
-                      key={index}
-                      className="h-52 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200"
-                    />
+                <select
+                  className="h-11 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none focus:border-brand-500"
+                  value={activeCategory}
+                  onChange={(event) => setCategory(event.target.value)}
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat === "all"
+                        ? "All Items"
+                        : categoryLabelByKey[cat] || cat}
+                    </option>
                   ))}
-                </div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500 ring-1 ring-slate-200">
-                  No products match your filters.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
-                  {filteredProducts.map((product) => (
-                    <ProductCard
-                      key={product._id}
-                      product={product}
-                      highlight={highlightProductId === product._id}
-                      onQuickAdd={(pickedProduct) => {
-                        addItem(pickedProduct);
-                        triggerAddedFeedback(pickedProduct.name, pickedProduct._id);
-                      }}
-                      onOpenDetails={(pickedProduct) => {
-                        setDetailsProduct(pickedProduct);
-                        setDetailsQuantity(1);
-                        setDetailsNote("");
-                        setDetailsVariant("Regular");
-                      }}
-                    />
-                  ))}
-                </div>
+                </select>
+              </div>
+
+              {barcodeEnabled && showBarcodeScannerPanel && isMobile ? (
+                <Link
+                  href="/scanner"
+                  className="flex h-12 items-center justify-center rounded-2xl bg-brand-600 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+                >
+                  Scan Item
+                </Link>
+              ) : null}
+
+              {!isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setShowScannerPanel((prev) => !prev)}
+                  className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700 transition hover:bg-brand-200"
+                >
+                  {showScannerPanel ? "Hide Scanner" : "Show Scanner"}
+                </button>
               )}
+
+              {barcodeEnabled &&
+              showBarcodeScannerPanel &&
+              showScannerPanel &&
+              !isMobile ? (
+                <div className="rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div
+                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${scannerStatusClassName}`}
+                    >
+                      {scannerStatus}
+                    </div>
+                  </div>
+
+                  {showScannerPanel ? (
+                    <BarcodeScannerPanel
+                      modes={allowedScannerModes}
+                      defaultMode={defaultScannerMode}
+                      barcodeValue={barcodeInput}
+                      onBarcodeValueChange={(value) => {
+                        setBarcodeInput(value);
+                        setSearch(value);
+                      }}
+                      onBarcodeSubmit={addProductByBarcode}
+                      onServerFrameDecode={async (imageData) => {
+                        try {
+                          const result = await posService.decodeBarcodeFrame({
+                            imageData,
+                          });
+                          return result.barcode || null;
+                        } catch {
+                          return null;
+                        }
+                      }}
+                      onStatusChange={(status, tone = "info") => {
+                        setScannerStatus(status);
+                        setScannerStatusTone(tone);
+                      }}
+                    />
+                  ) : (
+                    <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                      Scanner controls are hidden.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
+
+          <SimplebarScroll className="min-h-0 flex-1 pr-1">
+            {productsQuery.isLoading ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-52 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200"
+                  />
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="rounded-2xl bg-white p-6 text-center text-sm text-slate-500 ring-1 ring-slate-200">
+                No products match your filters.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+                {filteredProducts.map((product) => (
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    highlight={highlightProductId === product._id}
+                    onQuickAdd={(pickedProduct) => {
+                      addItem(pickedProduct);
+                      triggerAddedFeedback(
+                        pickedProduct.name,
+                        pickedProduct._id,
+                      );
+                    }}
+                    onOpenDetails={(pickedProduct) => {
+                      setDetailsProduct(pickedProduct);
+                      setDetailsQuantity(1);
+                      setDetailsNote("");
+                      setDetailsVariant("Regular");
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </SimplebarScroll>
         </section>
 
-        <aside className="hidden self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:sticky md:top-4 md:flex md:max-h-[calc(100dvh-7.5rem)] md:flex-col">
+        <aside className="hidden self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:flex md:h-full md:min-h-0 md:flex-col">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Current Cart</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Current Cart
+            </h2>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
               {itemCount} items
             </span>
           </div>
-          <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          <SimplebarScroll className="mt-3 min-h-0 flex-1 pr-1" contentClassName="space-y-2">
             {items.length === 0 ? (
               <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
                 Cart is empty.
@@ -669,13 +587,17 @@ export default function POSPage() {
                 <CartItem
                   key={item.lineKey}
                   item={item}
-                  onIncrease={() => setQuantity(item.lineKey, item.quantity + 1)}
-                  onDecrease={() => setQuantity(item.lineKey, item.quantity - 1)}
+                  onIncrease={() =>
+                    setQuantity(item.lineKey, item.quantity + 1)
+                  }
+                  onDecrease={() =>
+                    setQuantity(item.lineKey, item.quantity - 1)
+                  }
                   onRemove={() => removeItem(item.lineKey)}
                 />
               ))
             )}
-          </div>
+          </SimplebarScroll>
 
           <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
             <div className="flex items-center justify-between text-sm text-slate-600">
@@ -709,7 +631,11 @@ export default function POSPage() {
         </aside>
       </div>
 
-      <CartBar itemCount={itemCount} total={total} onOpenCart={() => setCheckoutOpen(true)} />
+      <CartBar
+        itemCount={itemCount}
+        total={total}
+        onOpenCart={() => setCheckoutOpen(true)}
+      />
 
       <CheckoutModal
         open={checkoutOpen}
@@ -751,11 +677,17 @@ export default function POSPage() {
       {detailsProduct ? (
         <div className="fixed inset-0 z-50 flex items-end bg-slate-900/40 p-0 sm:items-center sm:justify-center sm:p-4">
           <div className="w-full rounded-t-3xl bg-white p-4 shadow-xl sm:max-w-md sm:rounded-3xl sm:ring-1 sm:ring-slate-200">
-            <h3 className="text-lg font-semibold text-slate-900">{detailsProduct.name}</h3>
-            <p className="mt-1 text-sm text-slate-500">PHP {detailsProduct.price.toFixed(2)} each</p>
+            <h3 className="text-lg font-semibold text-slate-900">
+              {detailsProduct.name}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              PHP {detailsProduct.price.toFixed(2)} each
+            </p>
 
             <div className="mt-4">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Variant</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Variant
+              </label>
               <div className="mt-1 flex gap-2">
                 {["Regular", "Large"].map((option) => (
                   <button
@@ -775,11 +707,15 @@ export default function POSPage() {
             </div>
 
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">Quantity</span>
+              <span className="text-sm font-medium text-slate-700">
+                Quantity
+              </span>
               <div className="inline-flex items-center rounded-full bg-slate-100">
                 <button
                   type="button"
-                  onClick={() => setDetailsQuantity((prev) => Math.max(1, prev - 1))}
+                  onClick={() =>
+                    setDetailsQuantity((prev) => Math.max(1, prev - 1))
+                  }
                   className="h-9 w-9 text-base font-bold text-slate-700"
                 >
                   -
@@ -790,7 +726,9 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setDetailsQuantity((prev) => Math.min(prev + 1, detailsProduct.stock))
+                    setDetailsQuantity((prev) =>
+                      Math.min(prev + 1, detailsProduct.stock),
+                    )
                   }
                   className="h-9 w-9 text-base font-bold text-slate-700"
                 >
@@ -800,7 +738,9 @@ export default function POSPage() {
             </div>
 
             <div className="mt-4">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Notes
+              </label>
               <textarea
                 value={detailsNote}
                 onChange={(event) => setDetailsNote(event.target.value)}
@@ -822,7 +762,10 @@ export default function POSPage() {
                 type="button"
                 onClick={() => {
                   addProductWithQuantity(detailsProduct, detailsQuantity);
-                  triggerAddedFeedback(`${detailsProduct.name} (${detailsVariant})`, detailsProduct._id);
+                  triggerAddedFeedback(
+                    `${detailsProduct.name} (${detailsVariant})`,
+                    detailsProduct._id,
+                  );
                   setDetailsProduct(null);
                 }}
                 className="h-11 rounded-xl bg-brand-600 text-sm font-semibold text-white"

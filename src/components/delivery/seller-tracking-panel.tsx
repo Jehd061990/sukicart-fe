@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VirtualizedSimpleBarList } from "@/components/ui/virtualized-simplebar-list";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { useDeliverySocket } from "@/hooks/use-delivery-socket";
 import { orderService } from "@/lib/api/services/order.service";
 import {
@@ -612,7 +613,7 @@ export function SellerTrackingPanel() {
 
       {selectedOrder ? (
         <div className="fixed inset-0 z-2000 flex items-center justify-center bg-black/60 p-4">
-          <div className="relative z-2001 w-full max-w-2xl rounded-xl border bg-card p-5 shadow-xl overflow-auto">
+          <div className="relative z-2001 w-full max-w-2xl rounded-xl border bg-card p-5 shadow-xl overflow-hidden">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-heading text-lg font-medium">
@@ -655,7 +656,7 @@ export function SellerTrackingPanel() {
 
             <div className="mt-4">
               <h4 className="mb-2 font-heading text-lg font-medium">Items</h4>
-              <div className="max-h-60 space-y-2 overflow-y-auto">
+              <SimplebarScroll className="max-h-60" contentClassName="space-y-2">
                 {selectedOrder.items.map((item) => (
                   <div
                     key={`${selectedOrder.id}-${item.productId}-${item.variant || "regular"}-${item.note || ""}`}
@@ -679,7 +680,7 @@ export function SellerTrackingPanel() {
                     ) : null}
                   </div>
                 ))}
-              </div>
+              </SimplebarScroll>
             </div>
 
             {canShowPickupQrCompat ? (

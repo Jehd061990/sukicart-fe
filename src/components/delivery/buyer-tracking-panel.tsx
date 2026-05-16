@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VirtualizedSimpleBarList } from "@/components/ui/virtualized-simplebar-list";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { useDeliverySocket } from "@/hooks/use-delivery-socket";
 import { getTargetLocation } from "@/lib/delivery/tracking";
 import { deliveryService } from "@/lib/api/services/delivery.service";
@@ -360,7 +361,7 @@ export function BuyerTrackingPanel() {
 
             <div className="mt-4">
               <h4 className="mb-2 font-heading text-lg font-medium">Items</h4>
-              <div className="max-h-60 space-y-2 overflow-y-auto">
+              <SimplebarScroll className="max-h-60" contentClassName="space-y-2">
                 {selectedOrder.items.map((item) => (
                   <div
                     key={`${selectedOrder.id}-${item.productId}`}
@@ -376,7 +377,7 @@ export function BuyerTrackingPanel() {
                     </p>
                   </div>
                 ))}
-              </div>
+              </SimplebarScroll>
             </div>
 
             <div className="mt-5 flex flex-wrap justify-between gap-2">

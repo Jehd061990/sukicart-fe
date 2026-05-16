@@ -2,6 +2,7 @@
 
 import { POSCartItem } from "@/store/pos-cart.store";
 import { CartItem } from "@/components/pos/CartItem";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 
 interface CheckoutModalProps {
   open: boolean;
@@ -50,7 +51,7 @@ export function CheckoutModal({
           </button>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+        <SimplebarScroll className="flex-1 pr-1" contentClassName="space-y-2">
           {items.length === 0 ? (
             <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
               No items yet. Add products first.
@@ -66,7 +67,7 @@ export function CheckoutModal({
               />
             ))
           )}
-        </div>
+        </SimplebarScroll>
 
         <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
           <div className="flex items-center justify-between text-sm text-slate-600">

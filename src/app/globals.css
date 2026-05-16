@@ -239,3 +239,45 @@
     transform: translateX(-50%) scale(1);
   }
 }
+
+/* Global SimpleBar styling to match SukiGo theme across all scroll containers. */
+.simplebar-track.simplebar-vertical {
+  width: 8px;
+}
+
+.simplebar-track.simplebar-horizontal {
+  height: 8px;
+}
+
+.simplebar-scrollbar::before {
+  background-color: color-mix(in oklab, var(--brand) 76%, transparent);
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.simplebar-track.simplebar-vertical .simplebar-scrollbar:before,
+.simplebar-track.simplebar-horizontal .simplebar-scrollbar:before {
+  inset: 1px;
+}
+
+.simplebar-track .simplebar-scrollbar.simplebar-visible::before {
+  opacity: 0.95;
+}
+
+.simplebar-hover .simplebar-scrollbar::before,
+.simplebar-dragging .simplebar-scrollbar::before {
+  background-color: color-mix(in oklab, var(--brand) 84%, transparent);
+  opacity: 1;
+}
+
+.simplebar-track.simplebar-vertical,
+.simplebar-track.simplebar-horizontal {
+  background: color-mix(in oklab, var(--muted) 78%, transparent);
+  border-radius: 999px;
+}
+
+.dark .simplebar-track.simplebar-vertical,
+.dark .simplebar-track.simplebar-horizontal {
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
+}

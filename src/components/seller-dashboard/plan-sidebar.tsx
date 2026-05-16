@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Lock } from "lucide-react";
 import { SellerDashboardModule, SellerFeatureFlags } from "@/types/saas-dashboard";
 import { Button } from "@/components/ui/button";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 
 interface PlanSidebarProps {
   modules: SellerDashboardModule[];
@@ -31,45 +32,47 @@ export function PlanSidebar({
           </Button>
         </div>
 
-        <nav className="space-y-1 overflow-y-auto">
-          {modules.map((module) => {
-            const enabled = features[module.requiredFeature];
-            const active = activePath === module.href;
-            const Icon = module.icon;
+        <SimplebarScroll className="flex-1" contentClassName="space-y-1">
+          <nav>
+            {modules.map((module) => {
+              const enabled = features[module.requiredFeature];
+              const active = activePath === module.href;
+              const Icon = module.icon;
 
-            if (!enabled) {
+              if (!enabled) {
+                return (
+                  <div
+                    key={module.key}
+                    className="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 px-3 py-2"
+                  >
+                    <p className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                      <Lock className="h-4 w-4" />
+                      {!collapsed ? module.label : "Locked"}
+                    </p>
+                    {!collapsed ? (
+                      <p className="mt-1 text-xs text-amber-700">{module.upgradeMessage || "Upgrade to unlock"}</p>
+                    ) : null}
+                  </div>
+                );
+              }
+
               return (
-                <div
+                <Link
                   key={module.key}
-                  className="rounded-xl border border-dashed border-amber-300 bg-amber-50/70 px-3 py-2"
+                  href={module.href}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
                 >
-                  <p className="flex items-center gap-2 text-sm font-medium text-amber-800">
-                    <Lock className="h-4 w-4" />
-                    {!collapsed ? module.label : "Locked"}
-                  </p>
-                  {!collapsed ? (
-                    <p className="mt-1 text-xs text-amber-700">{module.upgradeMessage || "Upgrade to unlock"}</p>
-                  ) : null}
-                </div>
+                  <Icon className="h-4 w-4" />
+                  {!collapsed ? module.label : null}
+                </Link>
               );
-            }
-
-            return (
-              <Link
-                key={module.key}
-                href={module.href}
-                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {!collapsed ? module.label : null}
-              </Link>
-            );
-          })}
-        </nav>
+            })}
+          </nav>
+        </SimplebarScroll>
       </div>
     </aside>
   );
