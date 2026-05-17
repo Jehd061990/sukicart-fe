@@ -407,28 +407,32 @@ export default function POSPage() {
   }
 
   return (
-    <div className="relative h-full overflow-hidden bg-slate-100 pb-24 md:pb-0">
+    <div className="relative h-full overflow-hidden bg-slate-100 pb-24 xl:pb-0">
       {flashMessage ? (
         <div className="fixed right-4 top-4 z-50 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-lg transition">
           {flashMessage}
         </div>
       ) : null}
 
-      <div className="grid h-full p-3 gap-4 md:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
+      <div className="grid h-full gap-4 p-3 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="flex min-h-0 flex-col gap-3">
           <div className="sticky top-0 z-20 space-y-2 rounded-2xl bg-slate-100/95 pb-2 backdrop-blur md:top-1">
             <div className="space-y-1 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
               {/* <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Walk-in checkout
               </p> */}
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="ml-5 mt-1 text-2xl font-bold tracking-tight text-slate-900">
                 Point of Sale
               </h1>
-              <p className="text-sm text-slate-600">
-                Fast cart building for front-counter checkout.
-              </p>
 
-              <div className="mt-1 grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+              {!isMobile && (
+                <p className="ml-5 text-sm text-slate-600">
+                  Fast cart building for front-counter checkout.
+                </p>
+              )}
+              
+
+              <div className="mt-1 grid gap-2 xl:grid-cols-[minmax(0,1fr)_220px]">
                 <Input
                   autoFocus
                   className="h-11 border-slate-200 bg-slate-50 text-base focus-visible:border-brand-500 focus-visible:ring-brand-100"
@@ -529,7 +533,7 @@ export default function POSPage() {
 
           <SimplebarScroll className="min-h-0 flex-1 pr-1">
             {productsQuery.isLoading ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, index) => (
                   <div
                     key={index}
@@ -542,7 +546,7 @@ export default function POSPage() {
                 No products match your filters.
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-4">
                 {filteredProducts.map((product) => (
                   <ProductCard
                     key={product._id}
@@ -568,7 +572,7 @@ export default function POSPage() {
           </SimplebarScroll>
         </section>
 
-        <aside className="hidden self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:flex md:h-full md:min-h-0 md:flex-col">
+        <aside className="hidden self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">
               Current Cart

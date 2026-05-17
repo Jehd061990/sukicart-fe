@@ -24,11 +24,13 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "sukigo:sidebar-collapsed";
 interface AppSidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  forceDesktopCollapsed?: boolean;
 }
 
 export function AppSidebar({
   mobileOpen = false,
   onMobileClose,
+  forceDesktopCollapsed = false,
 }: AppSidebarProps) {
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
 
@@ -142,7 +144,7 @@ export function AppSidebar({
   };
 
   const renderSidebarContent = (isMobile: boolean) => {
-    const isCollapsed = !isMobile && isDesktopCollapsed;
+    const isCollapsed = !isMobile && (forceDesktopCollapsed || isDesktopCollapsed);
 
     return (
     <>
@@ -171,7 +173,7 @@ export function AppSidebar({
           >
             <X className="h-5 w-5" />
           </Button>
-        ) : (
+        ) : !forceDesktopCollapsed ? (
           <Button
             type="button"
             variant="ghost"
@@ -186,7 +188,7 @@ export function AppSidebar({
               <ChevronsLeft className="h-4 w-4" />
             )}
           </Button>
-        )}
+        ) : null}
       </div>
 
       <SimplebarScroll className="min-h-0 flex-1 pr-1" contentClassName="space-y-1">
@@ -251,7 +253,7 @@ export function AppSidebar({
       <aside
         className={cn(
           "sticky top-0 hidden h-screen shrink-0 border-r bg-card p-4 transition-all duration-200 md:block",
-          isDesktopCollapsed ? "w-20" : "w-64",
+          forceDesktopCollapsed || isDesktopCollapsed ? "w-20" : "w-64",
         )}
       >
         <div className="flex h-full flex-col">{renderSidebarContent(false)}</div>
