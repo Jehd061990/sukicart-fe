@@ -43,13 +43,19 @@ export const usePrinterManager = ({ context }: UsePrinterManagerArgs) => {
     setScanning(true);
     try {
       const result = await printerService.scanPrinters(resolvedContext);
-      setDiscoveredPrinters(result.printers);
+      const fallbackPrinters =
+        result.printers.length === 0 && selectedPrinter ? [selectedPrinter] : result.printers;
+
+      setDiscoveredPrinters(fallbackPrinters);
       setConnectionState("DISCONNECTED", result.message);
-      return result;
+      return {
+        ...result,
+        printers: fallbackPrinters,
+      };
     } finally {
       setScanning(false);
     }
-  }, [resolvedContext, setConnectionState, setDiscoveredPrinters, setScanning]);
+  }, [resolvedContext, selectedPrinter, setConnectionState, setDiscoveredPrinters, setScanning]);
 
   const connectPrinter = useCallback(
     async (printer?: ThermalPrinterDevice) => {

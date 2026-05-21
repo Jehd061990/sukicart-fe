@@ -1,6 +1,20 @@
 import { buildEscPosReceipt } from "@/lib/pos-printing/escpos";
 import { ReceiptPayload, ThermalPrinterDevice } from "@/lib/pos-printing/types";
 
+type BluetoothBridgeLike = {
+  scanDevices?: () => Promise<unknown>;
+  connect?: (args?: { macAddress?: string; address?: string; id?: string }) => Promise<void>;
+  disconnect?: () => Promise<void>;
+  isConnected?: () => Promise<{ connected: boolean }>;
+  getConnectedDevice?: () => Promise<unknown>;
+  printReceipt?: (args: { payload: ReceiptPayload }) => Promise<void>;
+  printEscPos?: (args: { data: string }) => Promise<void>;
+  getPairedDevices?: () => Promise<unknown>;
+  listPairedDevices?: () => Promise<unknown>;
+  listBondedDevices?: () => Promise<unknown>;
+  [key: string]: unknown;
+};
+
 export const getQZBridge = () => {
   if (typeof window === "undefined") {
     return null;
@@ -9,13 +23,42 @@ export const getQZBridge = () => {
   return window.qz || null;
 };
 
-export const getAndroidBluetoothBridge = () => {
+export const getAndroidBluetoothBridge = (): BluetoothBridgeLike | null => {
   if (typeof window === "undefined") {
     return null;
   }
 
   const plugins = window.Capacitor?.Plugins;
-  return plugins?.SukiBluetoothPrinter || plugins?.BluetoothPrinter || null;
+  const known = plugins?.SukiBluetoothPrinter || plugins?.BluetoothPrinter;
+  if (known) {
+    return known as BluetoothBridgeLike;
+  }
+
+  if (!plugins || typeof plugins !== "object") {
+    return null;
+  }
+
+  const entries = Object.entries(plugins as Record<string, unknown>);
+  for (const [key, value] of entries) {
+    if (!value || typeof value !== "object") {
+      continue;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const hasBluetoothName = /bluetooth|printer/i.test(key);
+    const hasBluetoothMethods =
+      typeof candidate.connect === "function" ||
+      typeof candidate.scanDevices === "function" ||
+      typeof candidate.getPairedDevices === "function" ||
+      typeof candidate.printReceipt === "function" ||
+      typeof candidate.printEscPos === "function";
+
+    if (hasBluetoothName && hasBluetoothMethods) {
+      return candidate as BluetoothBridgeLike;
+    }
+  }
+
+  return null;
 };
 
 const getWebBluetooth = () => {
@@ -84,16 +127,75 @@ const normalizeBluetoothDevice = (device: {
   };
 };
 
+type RawBluetoothDevice = {
+  id?: string;
+  name?: string;
+  macAddress?: string;
+  address?: string;
+  paired?: boolean;
+  rssi?: number;
+};
+
+const extractBluetoothDevices = (input: unknown): RawBluetoothDevice[] => {
+  if (Array.isArray(input)) {
+    return input as RawBluetoothDevice[];
+  }
+
+  if (!input || typeof input !== "object") {
+    return [];
+  }
+
+  const asRecord = input as Record<string, unknown>;
+  const listCandidateKeys = ["devices", "printers", "results", "data", "items"];
+
+  for (const key of listCandidateKeys) {
+    const value = asRecord[key];
+    if (Array.isArray(value)) {
+      return value as RawBluetoothDevice[];
+    }
+  }
+
+  if (
+    typeof asRecord.id === "string" ||
+    typeof asRecord.name === "string" ||
+    typeof asRecord.address === "string" ||
+    typeof asRecord.macAddress === "string"
+  ) {
+    return [asRecord as RawBluetoothDevice];
+  }
+
+  return [];
+};
+
 const normalizeBluetoothList = (
-  devices: Array<{
-    id?: string;
-    name?: string;
-    macAddress?: string;
-    address?: string;
-    paired?: boolean;
-    rssi?: number;
-  }> | null | undefined,
+  devices: Array<RawBluetoothDevice> | null | undefined,
 ) => (Array.isArray(devices) ? devices : []).map((entry) => normalizeBluetoothDevice(entry));
+
+const invokeDeviceListMethod = async (
+  bridge: Record<string, unknown> | null,
+  methodNames: string[],
+) => {
+  if (!bridge) {
+    return null;
+  }
+
+  for (const methodName of methodNames) {
+    const method = bridge[methodName];
+    if (typeof method !== "function") {
+      continue;
+    }
+
+    try {
+      const response = await (method as () => Promise<unknown>)();
+      const extracted = extractBluetoothDevices(response);
+      return extracted;
+    } catch {
+      // Keep trying other vendor-specific methods.
+    }
+  }
+
+  return null;
+};
 
 export const connectDesktopLocalBridge = async () => {
   const qz = getQZBridge();
@@ -138,8 +240,20 @@ export const connectAndroidBluetoothBridge = async () => {
 export const scanAndroidBluetoothPrinters = async () => {
   const bridge = getAndroidBluetoothBridge();
 
-  if (bridge?.scanDevices) {
-    const scanned = await bridge.scanDevices();
+  const bridgeRecord = bridge as Record<string, unknown> | null;
+  const scanned = await invokeDeviceListMethod(bridgeRecord, [
+    "scanDevices",
+    "startScan",
+    "discoverDevices",
+    "searchDevices",
+    "findDevices",
+    "requestDevices",
+    "getDevices",
+    "listDevices",
+    "getBluetoothDevices",
+  ]);
+
+  if (scanned) {
     const printers = normalizeBluetoothList(scanned);
 
     if (printers.length > 0) {
@@ -151,11 +265,18 @@ export const scanAndroidBluetoothPrinters = async () => {
     }
   }
 
-  const pairedDevicesMethod =
-    bridge?.getPairedDevices || bridge?.listPairedDevices || bridge?.listBondedDevices;
+  const paired = await invokeDeviceListMethod(bridgeRecord, [
+    "getPairedDevices",
+    "listPairedDevices",
+    "listBondedDevices",
+    "getBondedDevices",
+    "getPairedPrinters",
+    "listPairedPrinters",
+    "getBondedPrinters",
+    "listBondedPrinters",
+  ]);
 
-  if (pairedDevicesMethod) {
-    const paired = await pairedDevicesMethod();
+  if (paired) {
     const printers = normalizeBluetoothList(paired);
 
     return {
@@ -163,6 +284,23 @@ export const scanAndroidBluetoothPrinters = async () => {
       message: printers.length
         ? `Loaded ${printers.length} paired Bluetooth printer(s)`
         : "No paired Bluetooth printers found. Pair printer in Android Bluetooth settings first.",
+      printers,
+    };
+  }
+
+  const connected = await invokeDeviceListMethod(bridgeRecord, [
+    "getConnectedDevice",
+    "currentDevice",
+    "getCurrentDevice",
+    "getActiveDevice",
+    "getLastConnectedDevice",
+  ]);
+
+  if (connected && connected.length > 0) {
+    const printers = normalizeBluetoothList(connected);
+    return {
+      ok: true,
+      message: "Loaded currently connected Bluetooth printer",
       printers,
     };
   }
