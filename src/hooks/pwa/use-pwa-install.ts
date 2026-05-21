@@ -10,6 +10,8 @@ type BeforeInstallPromptEvent = Event & {
   }>;
 };
 
+type InstallPlatform = "ios" | "android" | "desktop" | "unknown";
+
 const DISMISSED_KEY = "sukicart-pwa-install-dismissed";
 const INSTALLED_KEY = "sukicart-pwa-installed";
 const DISMISS_TTL_MS = 1000 * 60 * 60 * 24;
@@ -25,6 +27,27 @@ const isStandaloneMode = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Boolean((window.navigator as any).standalone)
   );
+};
+
+const detectInstallPlatform = (): InstallPlatform => {
+  if (typeof navigator === "undefined") {
+    return "unknown";
+  }
+
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    return "ios";
+  }
+
+  if (/Android/i.test(ua)) {
+    return "android";
+  }
+
+  if (/Windows|Macintosh|Linux/i.test(ua)) {
+    return "desktop";
+  }
+
+  return "unknown";
 };
 
 const getInitialInstalled = () => {
@@ -54,8 +77,10 @@ export const usePWAInstall = () => {
     useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(getInitialInstalled);
   const [dismissed, setDismissed] = useState(getInitialDismissed);
+  const [platform, setPlatform] = useState<InstallPlatform>("unknown");
 
   useEffect(() => {
+    setPlatform(detectInstallPlatform());
     const standalone = isStandaloneMode();
     setIsInstalled(standalone);
 
@@ -122,8 +147,32 @@ export const usePWAInstall = () => {
     [deferredPrompt, dismissed, isInstalled],
   );
 
+  const canShowInstallFallback = useMemo(
+    () => !isInstalled && !dismissed,
+    [dismissed, isInstalled],
+  );
+
+  const installHint = useMemo(() => {
+    if (platform === "ios") {
+      return "Tap Share, then Add to Home Screen.";
+    }
+
+    if (platform === "android") {
+      return "Open browser menu, then tap Install app or Add to Home screen.";
+    }
+
+    if (platform === "desktop") {
+      return "Use browser install option in the address bar or app menu.";
+    }
+
+    return "Use your browser menu to install this app.";
+  }, [platform]);
+
   return {
     canInstall,
+    canShowInstallFallback,
+    installHint,
+    platform,
     isInstalled,
     promptInstall,
   };
