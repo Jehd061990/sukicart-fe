@@ -12,6 +12,16 @@ type BluetoothBridgeLike = {
   getPairedDevices?: () => Promise<unknown>;
   listPairedDevices?: () => Promise<unknown>;
   listBondedDevices?: () => Promise<unknown>;
+  requestPermissions?: () => Promise<unknown>;
+  requestBluetoothPermissions?: () => Promise<unknown>;
+  ensurePermissions?: () => Promise<unknown>;
+  checkPermissions?: () => Promise<unknown>;
+  enable?: () => Promise<unknown>;
+  enableBluetooth?: () => Promise<unknown>;
+  ensureBluetoothEnabled?: () => Promise<unknown>;
+  isEnabled?: () => Promise<boolean | { enabled?: boolean; isEnabled?: boolean }>;
+  initialize?: () => Promise<unknown>;
+  init?: () => Promise<unknown>;
   [key: string]: unknown;
 };
 
@@ -23,19 +33,31 @@ export const getQZBridge = () => {
   return window.qz || null;
 };
 
-export const getAndroidBluetoothBridge = (): BluetoothBridgeLike | null => {
+const resolveAndroidBluetoothBridge = (): {
+  bridge: BluetoothBridgeLike | null;
+  pluginName: string | null;
+} => {
   if (typeof window === "undefined") {
-    return null;
+    return {
+      bridge: null,
+      pluginName: null,
+    };
   }
 
   const plugins = window.Capacitor?.Plugins;
   const known = plugins?.SukiBluetoothPrinter || plugins?.BluetoothPrinter;
   if (known) {
-    return known as BluetoothBridgeLike;
+    return {
+      bridge: known as BluetoothBridgeLike,
+      pluginName: plugins?.SukiBluetoothPrinter ? "SukiBluetoothPrinter" : "BluetoothPrinter",
+    };
   }
 
   if (!plugins || typeof plugins !== "object") {
-    return null;
+    return {
+      bridge: null,
+      pluginName: null,
+    };
   }
 
   const entries = Object.entries(plugins as Record<string, unknown>);
@@ -54,11 +76,21 @@ export const getAndroidBluetoothBridge = (): BluetoothBridgeLike | null => {
       typeof candidate.printEscPos === "function";
 
     if (hasBluetoothName && hasBluetoothMethods) {
-      return candidate as BluetoothBridgeLike;
+      return {
+        bridge: candidate as BluetoothBridgeLike,
+        pluginName: key,
+      };
     }
   }
 
-  return null;
+  return {
+    bridge: null,
+    pluginName: null,
+  };
+};
+
+export const getAndroidBluetoothBridge = (): BluetoothBridgeLike | null => {
+  return resolveAndroidBluetoothBridge().bridge;
 };
 
 const getWebBluetooth = () => {
@@ -197,6 +229,121 @@ const invokeDeviceListMethod = async (
   return null;
 };
 
+const getBridgeMethodNames = (bridge: BluetoothBridgeLike | null) => {
+  if (!bridge) {
+    return [];
+  }
+
+  return Object.keys(bridge).filter((key) => typeof bridge[key] === "function");
+};
+
+const invokeBridgeMethod = async (
+  bridge: BluetoothBridgeLike | null,
+  methodNames: string[],
+) => {
+  if (!bridge) {
+    return { called: false, response: null as unknown };
+  }
+
+  for (const methodName of methodNames) {
+    const method = bridge[methodName];
+    if (typeof method !== "function") {
+      continue;
+    }
+
+    try {
+      const response = await (method as () => Promise<unknown>)();
+      return { called: true, response };
+    } catch {
+      // Try the next vendor-specific method.
+    }
+  }
+
+  return { called: false, response: null as unknown };
+};
+
+const asEnabledState = (value: unknown) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return Boolean(record.enabled ?? record.isEnabled ?? false);
+  }
+
+  return false;
+};
+
+export const getAndroidBluetoothDiagnostics = async () => {
+  const resolved = resolveAndroidBluetoothBridge();
+  const bridge = resolved.bridge;
+
+  const isCapacitorNative =
+    typeof window !== "undefined" && typeof window.Capacitor?.isNativePlatform === "function"
+      ? Boolean(window.Capacitor.isNativePlatform())
+      : false;
+  const methods = getBridgeMethodNames(bridge);
+
+  const permissionCheck = await invokeBridgeMethod(bridge, ["checkPermissions"]);
+  const enabledCheck = await invokeBridgeMethod(bridge, ["isEnabled"]);
+
+  const permissionState = permissionCheck.called
+    ? JSON.stringify(permissionCheck.response)
+    : "unavailable";
+
+  return {
+    isCapacitorNative,
+    hasBridge: Boolean(bridge),
+    pluginName: resolved.pluginName,
+    methods,
+    permissionState,
+    bluetoothEnabled:
+      enabledCheck.called && enabledCheck.response !== null
+        ? asEnabledState(enabledCheck.response)
+        : null,
+  };
+};
+
+const prepareAndroidBluetoothBridge = async (bridge: BluetoothBridgeLike | null) => {
+  if (!bridge) {
+    return;
+  }
+
+  const check = await invokeBridgeMethod(bridge, ["checkPermissions"]);
+  if (check.called) {
+    const state = check.response as Record<string, unknown> | null;
+    const granted = Boolean(
+      state &&
+        (state.granted === true ||
+          state.bluetooth === "granted" ||
+          state.bluetoothScan === "granted" ||
+          state.bluetoothConnect === "granted"),
+    );
+
+    if (!granted) {
+      await invokeBridgeMethod(bridge, [
+        "requestPermissions",
+        "requestBluetoothPermissions",
+        "ensurePermissions",
+      ]);
+    }
+  } else {
+    await invokeBridgeMethod(bridge, [
+      "requestPermissions",
+      "requestBluetoothPermissions",
+      "ensurePermissions",
+    ]);
+  }
+
+  const enabledCheck = await invokeBridgeMethod(bridge, ["isEnabled"]);
+  if (!enabledCheck.called || !asEnabledState(enabledCheck.response)) {
+    await invokeBridgeMethod(bridge, ["ensureBluetoothEnabled", "enableBluetooth", "enable"]);
+  }
+
+  await invokeBridgeMethod(bridge, ["initialize", "init"]);
+};
+
 export const connectDesktopLocalBridge = async () => {
   const qz = getQZBridge();
   if (!qz) {
@@ -239,6 +386,7 @@ export const connectAndroidBluetoothBridge = async () => {
 
 export const scanAndroidBluetoothPrinters = async () => {
   const bridge = getAndroidBluetoothBridge();
+  await prepareAndroidBluetoothBridge(bridge);
 
   const bridgeRecord = bridge as Record<string, unknown> | null;
   const scanned = await invokeDeviceListMethod(bridgeRecord, [
@@ -334,8 +482,9 @@ export const scanAndroidBluetoothPrinters = async () => {
 
   return {
     ok: false,
-    message:
-      "No Android Bluetooth bridge detected. In browser/PWA mode, paired classic printers like BP-210 are not discoverable. Use Android app build with Capacitor Bluetooth plugin.",
+    message: bridge
+      ? `Bluetooth bridge detected but no device methods returned printers. Available methods: ${getBridgeMethodNames(bridge).join(", ") || "none"}`
+      : "No Android Bluetooth bridge detected. In browser/PWA mode, paired classic printers like BP-210 are not discoverable. Use Android app build with Capacitor Bluetooth plugin.",
     printers: [],
   };
 };
@@ -345,6 +494,8 @@ export const connectAndroidBluetoothPrinter = async (printer?: ThermalPrinterDev
   if (!bridge) {
     return { ok: false, message: "Android Bluetooth printer bridge was not found" };
   }
+
+  await prepareAndroidBluetoothBridge(bridge);
 
   if (bridge.isConnected) {
     const state = await bridge.isConnected();

@@ -58,6 +58,16 @@ declare global {
         rssi?: number;
       }>
     >;
+    requestPermissions?: () => Promise<unknown>;
+    requestBluetoothPermissions?: () => Promise<unknown>;
+    ensurePermissions?: () => Promise<unknown>;
+    checkPermissions?: () => Promise<unknown>;
+    enable?: () => Promise<unknown>;
+    enableBluetooth?: () => Promise<unknown>;
+    ensureBluetoothEnabled?: () => Promise<unknown>;
+    isEnabled?: () => Promise<boolean | { enabled?: boolean; isEnabled?: boolean }>;
+    initialize?: () => Promise<unknown>;
+    init?: () => Promise<unknown>;
     isConnected?: () => Promise<{ connected: boolean }>;
     getConnectedDevice?: () => Promise<{
       id?: string;

@@ -19,6 +19,7 @@ import { posService } from "@/lib/api/services/pos.service";
 import { usePOSDeviceProfile } from "@/hooks/pos/use-device-profile";
 import { usePrinterManager } from "@/hooks/pos/use-printer-manager";
 import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
+import { getAndroidBluetoothDiagnostics } from "@/lib/pos-printing/bridge-contracts";
 import { printerService } from "@/lib/pos-printing/printer-service";
 import { openReceiptPrintWindow } from "@/lib/pos-printing/receipt-template";
 import { ReceiptPayload, ThermalPrinterDevice } from "@/lib/pos-printing/types";
@@ -138,6 +139,15 @@ export default function POSPage() {
   const [showPrinterPanel, setShowPrinterPanel] = useState(false);
   const [isSavingPrinterDefault, setIsSavingPrinterDefault] = useState(false);
   const [manualPrinterMac, setManualPrinterMac] = useState("");
+  const [isLoadingBluetoothDiagnostics, setIsLoadingBluetoothDiagnostics] = useState(false);
+  const [bluetoothDiagnostics, setBluetoothDiagnostics] = useState<{
+    isCapacitorNative: boolean;
+    hasBridge: boolean;
+    pluginName: string | null;
+    methods: string[];
+    permissionState: string;
+    bluetoothEnabled: boolean | null;
+  } | null>(null);
   const [printActionMessage, setPrintActionMessage] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -418,6 +428,24 @@ export default function POSPage() {
       setManualPrinterMac(normalizeMacAddress(configuredMac));
     }
   }, [configuredBluetoothPrinter?.printerMac, manualPrinterMac]);
+
+  useEffect(() => {
+    if (!showPrinterPanel || (!runtimeProfile.isAndroid && !runtimeProfile.isPWA)) {
+      return;
+    }
+
+    const run = async () => {
+      setIsLoadingBluetoothDiagnostics(true);
+      try {
+        const diagnostics = await getAndroidBluetoothDiagnostics();
+        setBluetoothDiagnostics(diagnostics);
+      } finally {
+        setIsLoadingBluetoothDiagnostics(false);
+      }
+    };
+
+    void run();
+  }, [showPrinterPanel, runtimeProfile.isAndroid, runtimeProfile.isPWA]);
 
   useEffect(() => {
     if (!isDesktopLayout) {
@@ -736,6 +764,16 @@ export default function POSPage() {
     setLatestStatus("BLUETOOTH_DISCONNECTED", result.message);
   };
 
+  const loadBluetoothDiagnostics = async () => {
+    setIsLoadingBluetoothDiagnostics(true);
+    try {
+      const diagnostics = await getAndroidBluetoothDiagnostics();
+      setBluetoothDiagnostics(diagnostics);
+    } finally {
+      setIsLoadingBluetoothDiagnostics(false);
+    }
+  };
+
   const disconnectBluetoothPrinter = async () => {
     const result = await printerManager.disconnectPrinter();
     setPrintActionMessage(result.message);
@@ -907,6 +945,46 @@ export default function POSPage() {
 
             {showPrinterPanel ? (
               <div className="mt-3 space-y-2 text-xs">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-700">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Plugin Debug
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void loadBluetoothDiagnostics()}
+                      disabled={isLoadingBluetoothDiagnostics}
+                      className="rounded-md bg-slate-800 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-60"
+                    >
+                      {isLoadingBluetoothDiagnostics ? "Loading..." : "Refresh"}
+                    </button>
+                  </div>
+                  {bluetoothDiagnostics ? (
+                    <div className="space-y-1 text-[11px]">
+                      <p>
+                        Native Runtime: <strong>{bluetoothDiagnostics.isCapacitorNative ? "YES" : "NO"}</strong>
+                      </p>
+                      <p>
+                        Bridge Detected: <strong>{bluetoothDiagnostics.hasBridge ? "YES" : "NO"}</strong>
+                      </p>
+                      <p>
+                        Plugin: <strong>{bluetoothDiagnostics.pluginName || "Unknown"}</strong>
+                      </p>
+                      <p>
+                        Bluetooth Enabled: <strong>{bluetoothDiagnostics.bluetoothEnabled === null ? "Unknown" : bluetoothDiagnostics.bluetoothEnabled ? "YES" : "NO"}</strong>
+                      </p>
+                      <p>Permissions: {bluetoothDiagnostics.permissionState}</p>
+                      <p>
+                        Methods: {bluetoothDiagnostics.methods.length ? bluetoothDiagnostics.methods.join(", ") : "none"}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">
+                      Tap Refresh to inspect native plugin state.
+                    </p>
+                  )}
+                </div>
+
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-slate-700">
                   <p>
                     Connection: <strong>{printerManager.connectionStatus}</strong>
