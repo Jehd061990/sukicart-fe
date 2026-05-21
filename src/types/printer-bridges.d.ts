@@ -28,6 +28,36 @@ declare global {
         rssi?: number;
       }>
     >;
+    getPairedDevices?: () => Promise<
+      Array<{
+        id?: string;
+        name?: string;
+        macAddress?: string;
+        address?: string;
+        paired?: boolean;
+        rssi?: number;
+      }>
+    >;
+    listPairedDevices?: () => Promise<
+      Array<{
+        id?: string;
+        name?: string;
+        macAddress?: string;
+        address?: string;
+        paired?: boolean;
+        rssi?: number;
+      }>
+    >;
+    listBondedDevices?: () => Promise<
+      Array<{
+        id?: string;
+        name?: string;
+        macAddress?: string;
+        address?: string;
+        paired?: boolean;
+        rssi?: number;
+      }>
+    >;
     isConnected?: () => Promise<{ connected: boolean }>;
     getConnectedDevice?: () => Promise<{
       id?: string;

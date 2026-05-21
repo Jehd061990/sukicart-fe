@@ -84,6 +84,17 @@ const normalizeBluetoothDevice = (device: {
   };
 };
 
+const normalizeBluetoothList = (
+  devices: Array<{
+    id?: string;
+    name?: string;
+    macAddress?: string;
+    address?: string;
+    paired?: boolean;
+    rssi?: number;
+  }> | null | undefined,
+) => (Array.isArray(devices) ? devices : []).map((entry) => normalizeBluetoothDevice(entry));
+
 export const connectDesktopLocalBridge = async () => {
   const qz = getQZBridge();
   if (!qz) {
@@ -129,15 +140,29 @@ export const scanAndroidBluetoothPrinters = async () => {
 
   if (bridge?.scanDevices) {
     const scanned = await bridge.scanDevices();
-    const printers = (Array.isArray(scanned) ? scanned : []).map((entry) =>
-      normalizeBluetoothDevice(entry),
-    );
+    const printers = normalizeBluetoothList(scanned);
+
+    if (printers.length > 0) {
+      return {
+        ok: true,
+        message: `Discovered ${printers.length} Bluetooth printer(s)`,
+        printers,
+      };
+    }
+  }
+
+  const pairedDevicesMethod =
+    bridge?.getPairedDevices || bridge?.listPairedDevices || bridge?.listBondedDevices;
+
+  if (pairedDevicesMethod) {
+    const paired = await pairedDevicesMethod();
+    const printers = normalizeBluetoothList(paired);
 
     return {
-      ok: true,
+      ok: printers.length > 0,
       message: printers.length
-        ? `Discovered ${printers.length} Bluetooth printer(s)`
-        : "No Bluetooth printers found",
+        ? `Loaded ${printers.length} paired Bluetooth printer(s)`
+        : "No paired Bluetooth printers found. Pair printer in Android Bluetooth settings first.",
       printers,
     };
   }
@@ -171,7 +196,8 @@ export const scanAndroidBluetoothPrinters = async () => {
 
   return {
     ok: false,
-    message: "No Bluetooth scanner bridge detected",
+    message:
+      "No Android Bluetooth bridge detected. In browser/PWA mode, paired classic printers like BP-210 are not discoverable. Use Android app build with Capacitor Bluetooth plugin.",
     printers: [],
   };
 };

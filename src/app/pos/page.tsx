@@ -107,6 +107,17 @@ const barcodeVariants = (value: string) => {
   return Array.from(variants);
 };
 
+const normalizeMacAddress = (value: string) =>
+  value
+    .trim()
+    .toUpperCase()
+    .replace(/[^0-9A-F]/g, "")
+    .slice(0, 12)
+    .match(/.{1,2}/g)
+    ?.join(":") || "";
+
+const isValidMacAddress = (value: string) => /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(value);
+
 export default function POSPage() {
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -126,6 +137,7 @@ export default function POSPage() {
   const [showScannerPanel, setShowScannerPanel] = useState(true);
   const [showPrinterPanel, setShowPrinterPanel] = useState(false);
   const [isSavingPrinterDefault, setIsSavingPrinterDefault] = useState(false);
+  const [manualPrinterMac, setManualPrinterMac] = useState("");
   const [printActionMessage, setPrintActionMessage] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -395,6 +407,17 @@ export default function POSPage() {
   useEffect(() => {
     void hydrateFailedReceipts();
   }, [hydrateFailedReceipts]);
+
+  useEffect(() => {
+    if (manualPrinterMac) {
+      return;
+    }
+
+    const configuredMac = String(configuredBluetoothPrinter?.printerMac || "").trim();
+    if (configuredMac) {
+      setManualPrinterMac(normalizeMacAddress(configuredMac));
+    }
+  }, [configuredBluetoothPrinter?.printerMac, manualPrinterMac]);
 
   useEffect(() => {
     if (!isDesktopLayout) {
@@ -686,6 +709,33 @@ export default function POSPage() {
     setLatestStatus("BLUETOOTH_DISCONNECTED", result.message);
   };
 
+  const connectBluetoothByMac = async () => {
+    const normalizedMac = normalizeMacAddress(manualPrinterMac);
+    if (!isValidMacAddress(normalizedMac)) {
+      setPrintActionMessage("Enter a valid printer MAC (example: AA:BB:CC:DD:EE:FF).");
+      return;
+    }
+
+    setManualPrinterMac(normalizedMac);
+
+    const manualPrinter: ThermalPrinterDevice = {
+      id: normalizedMac,
+      name: `Manual ${normalizedMac}`,
+      macAddress: normalizedMac,
+      connectionType: "bluetooth",
+      paired: true,
+    };
+
+    const result = await printerManager.connectPrinter(manualPrinter);
+    setPrintActionMessage(result.message);
+    if (result.status === "CONNECTED") {
+      setLatestStatus("PRINT_SUCCESS", result.message);
+      return;
+    }
+
+    setLatestStatus("BLUETOOTH_DISCONNECTED", result.message);
+  };
+
   const disconnectBluetoothPrinter = async () => {
     const result = await printerManager.disconnectPrinter();
     setPrintActionMessage(result.message);
@@ -933,6 +983,29 @@ export default function POSPage() {
                       onChange={(event) => printerManager.setAutoReconnect(event.target.checked)}
                     />
                   </label>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Manual MAC Connect (for paired BP-210/XPrinter)
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="text"
+                      value={manualPrinterMac}
+                      onChange={(event) => setManualPrinterMac(normalizeMacAddress(event.target.value))}
+                      placeholder="AA:BB:CC:DD:EE:FF"
+                      className="h-8 min-w-48 flex-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void connectBluetoothByMac()}
+                      disabled={printerManager.isConnecting}
+                      className="rounded-md bg-slate-800 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-60"
+                    >
+                      {printerManager.isConnecting ? "Connecting..." : "Connect by MAC"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
