@@ -534,6 +534,14 @@ export default function RiderAcceptOrderPage() {
       return;
     }
 
+    const socketWithAck = assignmentSocket as unknown as {
+      emit: (
+        event: "accept_order" | "decline_order",
+        payload: { orderId: string },
+        callback: (response: { success: boolean; message?: string }) => void,
+      ) => void;
+    };
+
     if (secondsLeft <= 0) {
       toast.error("This request has expired");
       setIncomingOrder(null);
@@ -542,7 +550,7 @@ export default function RiderAcceptOrderPage() {
 
     setIsResponding(true);
 
-    assignmentSocket.emit(
+    socketWithAck.emit(
       decision,
       { orderId: incomingOrder.orderId },
       (response: { success: boolean; message?: string }) => {
