@@ -13,8 +13,10 @@ import {
   PrintContext,
   PrinterAdapter,
   PrinterAdapterType,
+  PrinterConnectionResult,
   PrintResult,
   ReceiptPayload,
+  ThermalPrinterDevice,
 } from "@/lib/pos-printing/types";
 
 const ADAPTERS: PrinterAdapter[] = [
@@ -72,19 +74,106 @@ export const printerService = {
     return adapter.printReceipt(payload, context);
   },
 
-  async connectPrinter(context: PrintContext): Promise<PrintResult> {
+  async printTestReceipt(context: PrintContext): Promise<PrintResult> {
+    const timestamp = new Date();
+    return this.printReceipt(
+      {
+        receiptId: `test-${timestamp.getTime()}`,
+        orderId: "TEST-RECEIPT",
+        createdAt: timestamp.toISOString(),
+        sellerName: "SukiGo POS",
+        cashierName: "System",
+        deviceName: context.runtimeProfile.runtimeMode.toUpperCase(),
+        paperSize: context.printerSettings?.paperSize || "58mm",
+        items: [
+          { name: "Printer handshake", quantity: 1, price: 0 },
+          { name: "ESC/POS sample", quantity: 1, price: 0 },
+        ],
+        subtotal: 0,
+        discount: 0,
+        total: 0,
+        paymentMethod: "Test",
+        qrCodeValue: `SukiGo:${timestamp.toISOString()}`,
+        footerText: `Printer check ${timestamp.toLocaleString()}`,
+      },
+      context,
+    );
+  },
+
+  async scanPrinters(context: PrintContext) {
+    const adapter = chooseAdapter(context);
+    if (!adapter.scan) {
+      return {
+        adapterType: adapter.type,
+        printers: [],
+        message: `${adapter.type} adapter does not support scanning`,
+      };
+    }
+
+    return adapter.scan(context);
+  },
+
+  async connectPrinter(
+    context: PrintContext,
+    printer?: ThermalPrinterDevice,
+  ): Promise<PrinterConnectionResult> {
     const adapter = chooseAdapter(context);
 
     if (adapter.connect) {
-      return adapter.connect(context);
+      return adapter.connect(context, printer);
     }
 
     return {
       adapterType: adapter.type,
-      status: "PRINT_SUCCESS",
+      status: "CONNECTED",
       message: `${adapter.type} adapter is ready`,
-      printedAt: new Date().toISOString(),
     };
+  },
+
+  async disconnectPrinter(
+    context: PrintContext,
+    printer?: ThermalPrinterDevice,
+  ): Promise<PrinterConnectionResult> {
+    const adapter = chooseAdapter(context);
+
+    if (adapter.disconnect) {
+      return adapter.disconnect(context, printer);
+    }
+
+    return {
+      adapterType: adapter.type,
+      status: "DISCONNECTED",
+      message: `${adapter.type} adapter disconnected`,
+    };
+  },
+
+  async getConnectionStatus(
+    context: PrintContext,
+    printer?: ThermalPrinterDevice,
+  ): Promise<PrinterConnectionResult> {
+    const adapter = chooseAdapter(context);
+
+    if (adapter.getConnectionStatus) {
+      return adapter.getConnectionStatus(context, printer);
+    }
+
+    return {
+      adapterType: adapter.type,
+      status: "CONNECTED",
+      message: `${adapter.type} adapter ready`,
+    };
+  },
+
+  async autoReconnect(
+    context: PrintContext,
+    printer?: ThermalPrinterDevice,
+  ): Promise<PrinterConnectionResult> {
+    const status = await this.getConnectionStatus(context, printer);
+    if (status.status === "CONNECTED") {
+      return status;
+    }
+
+    return this.connectPrinter(context, printer);
   },
 
   getBridgeHealth(context: PrintContext) {

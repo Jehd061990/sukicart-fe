@@ -1,4 +1,5 @@
-import { ReceiptPayload } from "@/lib/pos-printing/types";
+import { buildEscPosReceipt } from "@/lib/pos-printing/escpos";
+import { ReceiptPayload, ThermalPrinterDevice } from "@/lib/pos-printing/types";
 
 export const getQZBridge = () => {
   if (typeof window === "undefined") {
@@ -17,26 +18,30 @@ export const getAndroidBluetoothBridge = () => {
   return plugins?.SukiBluetoothPrinter || plugins?.BluetoothPrinter || null;
 };
 
+const getWebBluetooth = () => {
+  if (typeof navigator === "undefined") {
+    return null;
+  }
+
+  const webNavigator = navigator as Navigator & {
+    bluetooth?: {
+      requestDevice?: (options: {
+        acceptAllDevices?: boolean;
+        optionalServices?: string[];
+      }) => Promise<{ id: string; name?: string | null }>;
+    };
+  };
+
+  return webNavigator.bluetooth || null;
+};
+
 export const isDesktopLocalBridgeAvailable = () => {
   const qz = getQZBridge();
   return Boolean(qz);
 };
 
 export const isAndroidBluetoothBridgeAvailable = () => {
-  return Boolean(getAndroidBluetoothBridge());
-};
-
-export const connectDesktopLocalBridge = async () => {
-  const qz = getQZBridge();
-  if (!qz) {
-    return { ok: false, message: "QZ Tray bridge was not found" };
-  }
-
-  if (!qz.websocket.isActive()) {
-    await qz.websocket.connect();
-  }
-
-  return { ok: true, message: "QZ Tray bridge connected" };
+  return Boolean(getAndroidBluetoothBridge() || getWebBluetooth());
 };
 
 const toEscPosText = (payload: ReceiptPayload) => {
@@ -56,6 +61,40 @@ const toEscPosText = (payload: ReceiptPayload) => {
     `Total: ${payload.total.toFixed(2)}`,
     "\n\n\n",
   ].join("\n");
+};
+
+const normalizeBluetoothDevice = (device: {
+  id?: string;
+  name?: string;
+  macAddress?: string;
+  address?: string;
+  paired?: boolean;
+  rssi?: number;
+}): ThermalPrinterDevice => {
+  const macAddress = device.macAddress || device.address || "";
+  const id = device.id || macAddress || `${device.name || "printer"}-${Date.now()}`;
+
+  return {
+    id,
+    name: device.name || "Unknown Bluetooth Printer",
+    macAddress: macAddress || undefined,
+    paired: Boolean(device.paired),
+    connectionType: "bluetooth",
+    rssi: typeof device.rssi === "number" ? device.rssi : undefined,
+  };
+};
+
+export const connectDesktopLocalBridge = async () => {
+  const qz = getQZBridge();
+  if (!qz) {
+    return { ok: false, message: "QZ Tray bridge was not found" };
+  }
+
+  if (!qz.websocket.isActive()) {
+    await qz.websocket.connect();
+  }
+
+  return { ok: true, message: "QZ Tray bridge connected" };
 };
 
 export const printThroughDesktopLocalBridge = async (
@@ -82,6 +121,62 @@ export const printThroughDesktopLocalBridge = async (
 };
 
 export const connectAndroidBluetoothBridge = async () => {
+  return connectAndroidBluetoothPrinter();
+};
+
+export const scanAndroidBluetoothPrinters = async () => {
+  const bridge = getAndroidBluetoothBridge();
+
+  if (bridge?.scanDevices) {
+    const scanned = await bridge.scanDevices();
+    const printers = (Array.isArray(scanned) ? scanned : []).map((entry) =>
+      normalizeBluetoothDevice(entry),
+    );
+
+    return {
+      ok: true,
+      message: printers.length
+        ? `Discovered ${printers.length} Bluetooth printer(s)`
+        : "No Bluetooth printers found",
+      printers,
+    };
+  }
+
+  const bluetooth = getWebBluetooth();
+  if (bluetooth?.requestDevice) {
+    try {
+      const device = await bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ["battery_service"],
+      });
+
+      const printer = normalizeBluetoothDevice({
+        id: device.id,
+        name: device.name || "Web Bluetooth Device",
+      });
+
+      return {
+        ok: true,
+        message: "Bluetooth printer selected",
+        printers: [printer],
+      };
+    } catch {
+      return {
+        ok: false,
+        message: "Bluetooth scan canceled or unavailable",
+        printers: [],
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    message: "No Bluetooth scanner bridge detected",
+    printers: [],
+  };
+};
+
+export const connectAndroidBluetoothPrinter = async (printer?: ThermalPrinterDevice) => {
   const bridge = getAndroidBluetoothBridge();
   if (!bridge) {
     return { ok: false, message: "Android Bluetooth printer bridge was not found" };
@@ -95,11 +190,51 @@ export const connectAndroidBluetoothBridge = async () => {
   }
 
   if (bridge.connect) {
-    await bridge.connect();
+    await bridge.connect({
+      macAddress: printer?.macAddress,
+      address: printer?.macAddress,
+      id: printer?.id,
+    });
     return { ok: true, message: "Bluetooth printer connected" };
   }
 
   return { ok: false, message: "Bluetooth bridge has no connect method" };
+};
+
+export const disconnectAndroidBluetoothPrinter = async () => {
+  const bridge = getAndroidBluetoothBridge();
+  if (!bridge) {
+    return { ok: false, message: "Android Bluetooth printer bridge was not found" };
+  }
+
+  if (bridge.disconnect) {
+    await bridge.disconnect();
+    return { ok: true, message: "Bluetooth printer disconnected" };
+  }
+
+  return { ok: false, message: "Bluetooth bridge has no disconnect method" };
+};
+
+export const getAndroidBluetoothPrinterConnection = async () => {
+  const bridge = getAndroidBluetoothBridge();
+  if (!bridge) {
+    return {
+      ok: false,
+      connected: false,
+      message: "Android Bluetooth printer bridge was not found",
+      printer: null,
+    };
+  }
+
+  const state = bridge.isConnected ? await bridge.isConnected() : { connected: false };
+  const connectedDevice = bridge.getConnectedDevice ? await bridge.getConnectedDevice() : null;
+
+  return {
+    ok: true,
+    connected: Boolean(state.connected),
+    message: state.connected ? "Bluetooth printer connected" : "Bluetooth printer disconnected",
+    printer: connectedDevice ? normalizeBluetoothDevice(connectedDevice) : null,
+  };
 };
 
 export const printThroughAndroidBluetoothBridge = async (payload: ReceiptPayload) => {
@@ -114,8 +249,18 @@ export const printThroughAndroidBluetoothBridge = async (payload: ReceiptPayload
   }
 
   if (bridge.printEscPos) {
-    await bridge.printEscPos({ data: toEscPosText(payload) });
-    return { ok: true, message: "Printed ESC/POS through Android Bluetooth bridge" };
+    const escpos = buildEscPosReceipt(payload);
+
+    try {
+      await bridge.printEscPos({ data: escpos.base64 });
+      return { ok: true, message: "Printed ESC/POS through Android Bluetooth bridge" };
+    } catch {
+      await bridge.printEscPos({ data: toEscPosText(payload) });
+      return {
+        ok: true,
+        message: "Printed text fallback through Android Bluetooth bridge",
+      };
+    }
   }
 
   return { ok: false, message: "Bluetooth bridge has no print method" };

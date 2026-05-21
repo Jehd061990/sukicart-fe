@@ -1,16 +1,21 @@
 import { openReceiptPrintWindow } from "@/lib/pos-printing/receipt-template";
 import {
-  connectAndroidBluetoothBridge,
+  connectAndroidBluetoothPrinter,
   connectDesktopLocalBridge,
+  disconnectAndroidBluetoothPrinter,
+  getAndroidBluetoothPrinterConnection,
   isAndroidBluetoothBridgeAvailable,
   isDesktopLocalBridgeAvailable,
+  scanAndroidBluetoothPrinters,
   printThroughAndroidBluetoothBridge,
   printThroughDesktopLocalBridge,
 } from "@/lib/pos-printing/bridge-contracts";
 import {
   PrintContext,
+  PrinterConnectionResult,
   PrinterAdapter,
   PrintResult,
+  PrinterScanResult,
   ReceiptPayload,
 } from "@/lib/pos-printing/types";
 
@@ -34,10 +39,47 @@ const failure = (
   message,
 });
 
+const connectionSuccess = (
+  adapterType: PrinterConnectionResult["adapterType"],
+  message: string,
+): PrinterConnectionResult => ({
+  adapterType,
+  status: "CONNECTED",
+  message,
+});
+
+const connectionFailure = (
+  adapterType: PrinterConnectionResult["adapterType"],
+  message: string,
+): PrinterConnectionResult => ({
+  adapterType,
+  status: "FAILED",
+  message,
+});
+
+const scanResponse = (
+  adapterType: PrinterScanResult["adapterType"],
+  message: string,
+): PrinterScanResult => ({
+  adapterType,
+  message,
+  printers: [],
+});
+
 export const BrowserPrintAdapter: PrinterAdapter = {
   type: "browser",
   isSupported: () => typeof window !== "undefined",
-  connect: async () => success("browser", "Browser print adapter ready"),
+  connect: async () => connectionSuccess("browser", "Browser print adapter ready"),
+  disconnect: async () => ({
+    adapterType: "browser",
+    status: "DISCONNECTED",
+    message: "Browser print adapter disconnected",
+  }),
+  getConnectionStatus: async () => ({
+    adapterType: "browser",
+    status: "CONNECTED",
+    message: "Browser print adapter ready",
+  }),
   printReceipt: async (payload: ReceiptPayload) => {
     const opened = openReceiptPrintWindow(payload);
     if (!opened) {
@@ -51,28 +93,97 @@ export const BrowserPrintAdapter: PrinterAdapter = {
 export const BluetoothPrintAdapter: PrinterAdapter = {
   type: "bluetooth",
   isSupported: (context: PrintContext) => context.runtimeProfile.isAndroid,
-  connect: async (context: PrintContext) => {
+  scan: async (context: PrintContext) => {
     if (!context.runtimeProfile.isAndroid) {
-      return failure("bluetooth", "BLUETOOTH_DISCONNECTED", "Bluetooth printing is Android-only");
+      return scanResponse("bluetooth", "Bluetooth scanning is Android-only");
+    }
+
+    try {
+      const result = await scanAndroidBluetoothPrinters();
+      return {
+        adapterType: "bluetooth",
+        printers: result.printers,
+        message: result.message,
+      };
+    } catch (error) {
+      return scanResponse("bluetooth", String(error));
+    }
+  },
+  connect: async (context: PrintContext, printer) => {
+    if (!context.runtimeProfile.isAndroid) {
+      return connectionFailure("bluetooth", "Bluetooth printing is Android-only");
     }
 
     if (!isAndroidBluetoothBridgeAvailable()) {
-      return failure(
+      return connectionFailure(
         "bluetooth",
-        "BLUETOOTH_DISCONNECTED",
         "Android Bluetooth bridge unavailable. Install Capacitor printer plugin.",
       );
     }
 
     try {
-      const result = await connectAndroidBluetoothBridge();
+      const result = await connectAndroidBluetoothPrinter(printer || context.selectedPrinter);
       if (!result.ok) {
-        return failure("bluetooth", "BLUETOOTH_DISCONNECTED", result.message);
+        return connectionFailure("bluetooth", result.message);
       }
 
-      return success("bluetooth", result.message);
+      return connectionSuccess("bluetooth", result.message);
     } catch (error) {
-      return failure("bluetooth", "BLUETOOTH_DISCONNECTED", String(error));
+      return connectionFailure("bluetooth", String(error));
+    }
+  },
+  disconnect: async (context: PrintContext) => {
+    if (!context.runtimeProfile.isAndroid) {
+      return {
+        adapterType: "bluetooth",
+        status: "DISCONNECTED",
+        message: "Bluetooth adapter ignored outside Android",
+      };
+    }
+
+    try {
+      const result = await disconnectAndroidBluetoothPrinter();
+      if (!result.ok) {
+        return connectionFailure("bluetooth", result.message);
+      }
+
+      return {
+        adapterType: "bluetooth",
+        status: "DISCONNECTED",
+        message: result.message,
+      };
+    } catch (error) {
+      return connectionFailure("bluetooth", String(error));
+    }
+  },
+  getConnectionStatus: async (context: PrintContext) => {
+    if (!context.runtimeProfile.isAndroid) {
+      return {
+        adapterType: "bluetooth",
+        status: "DISCONNECTED",
+        message: "Bluetooth printing is Android-only",
+      };
+    }
+
+    try {
+      const result = await getAndroidBluetoothPrinterConnection();
+      if (!result.ok || !result.connected) {
+        return {
+          adapterType: "bluetooth",
+          status: "DISCONNECTED",
+          message: result.message,
+          printer: result.printer || undefined,
+        };
+      }
+
+      return {
+        adapterType: "bluetooth",
+        status: "CONNECTED",
+        message: result.message,
+        printer: result.printer || undefined,
+      };
+    } catch (error) {
+      return connectionFailure("bluetooth", String(error));
     }
   },
   printReceipt: async (payload: ReceiptPayload, context: PrintContext) => {
@@ -107,11 +218,13 @@ export const AirPrintAdapter: PrinterAdapter = {
   isSupported: (context: PrintContext) => context.runtimeProfile.isIOS,
   connect: async (context: PrintContext) => {
     if (!context.runtimeProfile.isIOS) {
-      return failure("airprint", "PRINT_FAILED", "AirPrint supported only on iOS profile");
+      return connectionFailure("airprint", "AirPrint supported only on iOS profile");
     }
 
-    return success("airprint", "AirPrint will use iOS browser print dialog");
+    return connectionSuccess("airprint", "AirPrint will use iOS browser print dialog");
   },
+  getConnectionStatus: async () =>
+    connectionSuccess("airprint", "AirPrint will use iOS browser print dialog"),
   printReceipt: async (payload: ReceiptPayload, context: PrintContext) => {
     if (!context.runtimeProfile.isIOS) {
       return failure("airprint", "PRINT_FAILED", "AirPrint supported only on iOS profile");
@@ -132,23 +245,46 @@ export const FutureLocalBridgeAdapter: PrinterAdapter = {
     context.runtimeProfile.isDesktop && isDesktopLocalBridgeAvailable(),
   connect: async (context: PrintContext) => {
     if (!context.runtimeProfile.isDesktop) {
-      return failure("local-bridge", "PRINTER_OFFLINE", "Local bridge is desktop-only");
+      return connectionFailure("local-bridge", "Local bridge is desktop-only");
     }
 
     if (!isDesktopLocalBridgeAvailable()) {
-      return failure("local-bridge", "PRINTER_OFFLINE", "QZ Tray bridge not available");
+      return connectionFailure("local-bridge", "QZ Tray bridge not available");
     }
 
     try {
       const result = await connectDesktopLocalBridge();
       if (!result.ok) {
-        return failure("local-bridge", "PRINTER_OFFLINE", result.message);
+        return connectionFailure("local-bridge", result.message);
       }
 
-      return success("local-bridge", result.message);
+      return connectionSuccess("local-bridge", result.message);
     } catch (error) {
-      return failure("local-bridge", "PRINT_FAILED", String(error));
+      return connectionFailure("local-bridge", String(error));
     }
+  },
+  getConnectionStatus: async (context: PrintContext) => {
+    if (!context.runtimeProfile.isDesktop) {
+      return {
+        adapterType: "local-bridge",
+        status: "DISCONNECTED",
+        message: "Local bridge is desktop-only",
+      };
+    }
+
+    if (!isDesktopLocalBridgeAvailable()) {
+      return {
+        adapterType: "local-bridge",
+        status: "DISCONNECTED",
+        message: "QZ Tray bridge not available",
+      };
+    }
+
+    return {
+      adapterType: "local-bridge",
+      status: "CONNECTED",
+      message: "QZ Tray bridge detected",
+    };
   },
   printReceipt: async (payload: ReceiptPayload, context: PrintContext) => {
     if (!isDesktopLocalBridgeAvailable()) {

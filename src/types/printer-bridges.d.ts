@@ -18,8 +18,25 @@ declare global {
   }
 
   interface AndroidBluetoothPrinterBridge {
+    scanDevices?: () => Promise<
+      Array<{
+        id?: string;
+        name?: string;
+        macAddress?: string;
+        address?: string;
+        paired?: boolean;
+        rssi?: number;
+      }>
+    >;
     isConnected?: () => Promise<{ connected: boolean }>;
-    connect?: () => Promise<void>;
+    getConnectedDevice?: () => Promise<{
+      id?: string;
+      name?: string;
+      macAddress?: string;
+      address?: string;
+    } | null>;
+    connect?: (args?: { macAddress?: string; address?: string; id?: string }) => Promise<void>;
+    disconnect?: () => Promise<void>;
     printReceipt?: (args: { payload: ReceiptPayload }) => Promise<void>;
     printEscPos?: (args: { data: string }) => Promise<void>;
   }

@@ -1,3 +1,5 @@
+import { PrintStatus, ReceiptPayload } from "@/lib/pos-printing/types";
+
 export type SyncQueueEntry = {
   id?: number;
   type: "pos-order-create";
@@ -15,14 +17,25 @@ export type SyncQueueEntry = {
   createdAt: number;
 };
 
+export type FailedReceiptQueueEntry = {
+  id: string;
+  receipt: ReceiptPayload;
+  status: PrintStatus;
+  reason: string;
+  createdAt: string;
+  lastTriedAt?: string;
+  attempts: number;
+};
+
 const DB_NAME = "sukicart-offline-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   products: "products",
   cart: "cart",
   orders: "orders",
   syncQueue: "syncQueue",
+  failedPrintQueue: "failedPrintQueue",
   meta: "meta",
 } as const;
 
@@ -49,6 +62,12 @@ const openDatabase = (): Promise<IDBDatabase> => {
         db.createObjectStore(STORES.syncQueue, {
           keyPath: "id",
           autoIncrement: true,
+        });
+      }
+
+      if (!db.objectStoreNames.contains(STORES.failedPrintQueue)) {
+        db.createObjectStore(STORES.failedPrintQueue, {
+          keyPath: "id",
         });
       }
 
@@ -166,5 +185,25 @@ export const offlineDb = {
       store.count(),
     );
     return Number(count || 0);
+  },
+
+  async upsertFailedReceipt(entry: FailedReceiptQueueEntry) {
+    await withStore(STORES.failedPrintQueue, "readwrite", (store) => store.put(entry));
+  },
+
+  async removeFailedReceipt(id: string) {
+    await withStore(STORES.failedPrintQueue, "readwrite", (store) => store.delete(id));
+  },
+
+  async getFailedReceipts() {
+    const queue = await withStore<FailedReceiptQueueEntry[]>(
+      STORES.failedPrintQueue,
+      "readonly",
+      (store) => store.getAll(),
+    );
+
+    return (queue || []).sort(
+      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    );
   },
 };

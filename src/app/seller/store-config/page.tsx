@@ -8,6 +8,8 @@ import { ImageUploadDropzone } from "@/components/uploads/ImageUploadDropzone";
 import { posService } from "@/lib/api/services/pos.service";
 import { usePOSDeviceProfile } from "@/hooks/pos/use-device-profile";
 import { printerService } from "@/lib/pos-printing/printer-service";
+import { ThermalPrinterDevice } from "@/lib/pos-printing/types";
+import { usePrinterManagerStore } from "@/store/printer-manager.store";
 import {
   CategoryThumbnailShape,
   PreferredPOSMode,
@@ -110,6 +112,7 @@ const getAllowedPrinterAdapters = (
 
 type PrinterSectionKey =
   | "adapterProfile"
+  | "bluetoothManager"
   | "bridgeHealth"
   | "setupChecklist"
   | "actions";
@@ -118,6 +121,7 @@ type PrinterSectionsState = Record<PrinterSectionKey, boolean>;
 
 const DEFAULT_PRINTER_SECTION_STATE: PrinterSectionsState = {
   adapterProfile: true,
+  bluetoothManager: true,
   bridgeHealth: true,
   setupChecklist: true,
   actions: true,
@@ -162,6 +166,9 @@ export default function SellerStoreConfigPage() {
     receiptPaperSize: NonNullable<StorePrintingConfig["paperSize"]>;
     autoPrintReceipts: boolean;
     desktopPrinterName: string;
+    bluetoothPrinterName: string;
+    bluetoothPrinterMac: string;
+    bluetoothAutoReconnect: boolean;
     categoryCatalog: Array<{
       key: StoreCategoryKey;
       label: string;
@@ -181,6 +188,19 @@ export default function SellerStoreConfigPage() {
   const sectionsHydratedKeyRef = useRef<string | null>(null);
 
   const queryClient = useQueryClient();
+  const discoveredPrinters = usePrinterManagerStore((state) => state.discoveredPrinters);
+  const selectedPrinter = usePrinterManagerStore((state) => state.selectedPrinter);
+  const connectionStatus = usePrinterManagerStore((state) => state.connectionStatus);
+  const isScanning = usePrinterManagerStore((state) => state.isScanning);
+  const isConnecting = usePrinterManagerStore((state) => state.isConnecting);
+  const setDiscoveredPrinters = usePrinterManagerStore((state) => state.setDiscoveredPrinters);
+  const setSelectedPrinter = usePrinterManagerStore((state) => state.setSelectedPrinter);
+  const setConnectionState = usePrinterManagerStore((state) => state.setConnectionState);
+  const setPaperSize = usePrinterManagerStore((state) => state.setPaperSize);
+  const setAutoReconnect = usePrinterManagerStore((state) => state.setAutoReconnect);
+  const setScanning = usePrinterManagerStore((state) => state.setScanning);
+  const setConnecting = usePrinterManagerStore((state) => state.setConnecting);
+  const removeSavedPrinter = usePrinterManagerStore((state) => state.removeSavedPrinter);
 
   const storeConfigQuery = useQuery({
     queryKey: ["store-config", "me"],
@@ -194,6 +214,7 @@ export default function SellerStoreConfigPage() {
 
     const config = storeConfigQuery.data.config;
     const printing = config.printing || {};
+    const bluetoothPrinter = printing.bluetoothPrinter;
     return {
       storeType: storeConfigQuery.data.store.storeType,
       preferredPOSMode: storeConfigQuery.data.store.preferredPOSMode || "desktop",
@@ -214,6 +235,9 @@ export default function SellerStoreConfigPage() {
       receiptPaperSize: printing.paperSize || "80mm",
       autoPrintReceipts: printing.autoPrint !== false,
       desktopPrinterName: String(printing.desktopPrinterName || ""),
+      bluetoothPrinterName: String(bluetoothPrinter?.printerName || ""),
+      bluetoothPrinterMac: String(bluetoothPrinter?.printerMac || ""),
+      bluetoothAutoReconnect: bluetoothPrinter?.autoReconnect !== false,
       categoryCatalog: normalizeCategoryCatalog(config.uiBehavior.categoryCatalog),
     };
   }, [storeConfigQuery.data]);
@@ -296,6 +320,10 @@ export default function SellerStoreConfigPage() {
           typeof parsed.adapterProfile === "boolean"
             ? parsed.adapterProfile
             : DEFAULT_PRINTER_SECTION_STATE.adapterProfile,
+        bluetoothManager:
+          typeof parsed.bluetoothManager === "boolean"
+            ? parsed.bluetoothManager
+            : DEFAULT_PRINTER_SECTION_STATE.bluetoothManager,
         bridgeHealth:
           typeof parsed.bridgeHealth === "boolean"
             ? parsed.bridgeHealth
@@ -345,6 +373,29 @@ export default function SellerStoreConfigPage() {
 
     window.localStorage.setItem(sectionsStorageKey, JSON.stringify(printerSectionsOpen));
   }, [printerSectionsOpen, sectionsStorageKey]);
+
+  useEffect(() => {
+    if (!form) {
+      return;
+    }
+
+    setPaperSize(form.receiptPaperSize);
+    setAutoReconnect(form.bluetoothAutoReconnect);
+
+    if (form.bluetoothPrinterMac || form.bluetoothPrinterName) {
+      setSelectedPrinter({
+        id: form.bluetoothPrinterMac || form.bluetoothPrinterName,
+        name: form.bluetoothPrinterName || "Saved Bluetooth Printer",
+        macAddress: form.bluetoothPrinterMac || undefined,
+        connectionType: "bluetooth",
+      });
+    }
+  }, [
+    form,
+    setAutoReconnect,
+    setPaperSize,
+    setSelectedPrinter,
+  ]);
 
   useEffect(() => {
     if (!form) {
@@ -402,6 +453,16 @@ export default function SellerStoreConfigPage() {
             paperSize: form?.receiptPaperSize || "80mm",
             autoPrint: Boolean(form?.autoPrintReceipts),
             desktopPrinterName: String(form?.desktopPrinterName || "").trim(),
+            bluetoothPrinter:
+              form?.bluetoothPrinterMac || form?.bluetoothPrinterName
+                ? {
+                    printerName: String(form?.bluetoothPrinterName || "").trim(),
+                    printerMac: String(form?.bluetoothPrinterMac || "").trim(),
+                    connectionType: "bluetooth",
+                    paperSize: form?.receiptPaperSize || "58mm",
+                    autoReconnect: Boolean(form?.bluetoothAutoReconnect),
+                  }
+                : null,
           },
         },
       });
@@ -488,15 +549,98 @@ export default function SellerStoreConfigPage() {
   };
 
   const connectPrinterBridge = async () => {
-    const result = await printerService.connectPrinter({
+    const result = await printerService.connectPrinter(
+      {
       runtimeProfile,
       preferredAdapter: form.printerAdapter,
       preferBluetooth: form.printerAdapter === "bluetooth",
       printerName: form.desktopPrinterName.trim() || undefined,
-    });
+        selectedPrinter: selectedPrinter || undefined,
+        printerSettings:
+          form.printerAdapter === "bluetooth" && selectedPrinter
+            ? {
+                printerName: selectedPrinter.name,
+                printerMac: selectedPrinter.macAddress || selectedPrinter.id,
+                connectionType: "bluetooth",
+                paperSize: form.receiptPaperSize,
+                autoReconnect: form.bluetoothAutoReconnect,
+              }
+            : undefined,
+      },
+      selectedPrinter || undefined,
+    );
 
+    setConnectionState(result.status, result.message);
     setPrinterActionMessage(`${result.status}: ${result.message}`);
-    setBridgeConnectSuccess(result.status === "PRINT_SUCCESS");
+    setBridgeConnectSuccess(result.status === "CONNECTED");
+  };
+
+  const scanBluetoothPrinters = async () => {
+    setScanning(true);
+    try {
+      const result = await printerService.scanPrinters({
+        runtimeProfile,
+        preferredAdapter: "bluetooth",
+        preferBluetooth: true,
+      });
+
+      setDiscoveredPrinters(result.printers);
+      setPrinterActionMessage(result.message);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const connectBluetoothPrinter = async (printer: ThermalPrinterDevice) => {
+    setSelectedPrinter(printer);
+    updateDraft({
+      printerAdapter: "bluetooth",
+      bluetoothPrinterName: printer.name,
+      bluetoothPrinterMac: printer.macAddress || printer.id,
+    });
+    await connectPrinterBridge();
+  };
+
+  const disconnectBluetoothPrinter = async () => {
+    setConnecting(true);
+    try {
+      const result = await printerService.disconnectPrinter(
+        {
+          runtimeProfile,
+          preferredAdapter: "bluetooth",
+          preferBluetooth: true,
+          selectedPrinter: selectedPrinter || undefined,
+        },
+        selectedPrinter || undefined,
+      );
+      setConnectionState(result.status, result.message);
+      setPrinterActionMessage(`${result.status}: ${result.message}`);
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const savePreferredBluetoothPrinter = () => {
+    if (!selectedPrinter) {
+      setPrinterActionMessage("Select a Bluetooth printer before saving.");
+      return;
+    }
+
+    updateDraft({
+      printerAdapter: "bluetooth",
+      bluetoothPrinterName: selectedPrinter.name,
+      bluetoothPrinterMac: selectedPrinter.macAddress || selectedPrinter.id,
+    });
+    setPrinterActionMessage(`Saved ${selectedPrinter.name} as default Bluetooth printer.`);
+  };
+
+  const removePreferredBluetoothPrinter = () => {
+    removeSavedPrinter();
+    updateDraft({
+      bluetoothPrinterName: "",
+      bluetoothPrinterMac: "",
+    });
+    setPrinterActionMessage("Saved Bluetooth printer removed.");
   };
 
   const runFixIt = async (adapter: NonNullable<StorePrintingConfig["preferredAdapter"]>) => {
@@ -538,12 +682,28 @@ export default function SellerStoreConfigPage() {
         subtotal: 1,
         discount: 0,
         total: 1,
+        vat: 0.12,
+        paymentMethod: "Test",
+        qrCodeValue: `SukiGo Test ${new Date().toISOString()}`,
+        barcodeValue: "SUKIGO-TEST",
+        footerText: "Thermal printer validation complete.",
       },
       {
         runtimeProfile,
         preferredAdapter: form.printerAdapter,
         preferBluetooth: form.printerAdapter === "bluetooth",
         printerName: form.desktopPrinterName.trim() || undefined,
+        selectedPrinter: selectedPrinter || undefined,
+        printerSettings:
+          form.printerAdapter === "bluetooth" && selectedPrinter
+            ? {
+                printerName: selectedPrinter.name,
+                printerMac: selectedPrinter.macAddress || selectedPrinter.id,
+                connectionType: "bluetooth",
+                paperSize: form.receiptPaperSize,
+                autoReconnect: form.bluetoothAutoReconnect,
+              }
+            : undefined,
       },
     );
 
@@ -571,6 +731,7 @@ export default function SellerStoreConfigPage() {
   const setAllPrinterSections = (open: boolean) => {
     setPrinterSectionsOpen({
       adapterProfile: open,
+      bluetoothManager: open,
       bridgeHealth: open,
       setupChecklist: open,
       actions: open,
@@ -582,6 +743,7 @@ export default function SellerStoreConfigPage() {
     preferredAdapter: form.printerAdapter,
     preferBluetooth: form.printerAdapter === "bluetooth",
     printerName: form.desktopPrinterName.trim() || undefined,
+      selectedPrinter: selectedPrinter || undefined,
   });
 
   const adapterDiagnostics = useMemo(
@@ -1044,6 +1206,124 @@ export default function SellerStoreConfigPage() {
                 onChange={(event) => updateDraft({ autoPrintReceipts: event.target.checked })}
               />
             </label>
+          </div>
+        </details>
+
+        <details
+          open={printerSectionsOpen.bluetoothManager}
+          onToggle={(event) =>
+            togglePrinterSection(
+              "bluetoothManager",
+              (event.currentTarget as HTMLDetailsElement).open,
+            )
+          }
+          className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Bluetooth Printer Manager (Android)</summary>
+          <div className="mt-3 space-y-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+              <p>
+                Connection status: <strong>{connectionStatus}</strong>
+              </p>
+              <p className="mt-1">
+                Saved printer: <strong>{form.bluetoothPrinterName || "None"}</strong>
+              </p>
+              <p className="mt-1">
+                MAC: <strong>{form.bluetoothPrinterMac || "Not set"}</strong>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void scanBluetoothPrinters()} disabled={isScanning}>
+                {isScanning ? "Scanning..." : "Scan Devices"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void disconnectBluetoothPrinter()}
+                disabled={isConnecting || connectionStatus !== "CONNECTED"}
+              >
+                Disconnect
+              </Button>
+              <Button type="button" variant="outline" onClick={savePreferredBluetoothPrinter} disabled={!selectedPrinter}>
+                Save Printer
+              </Button>
+              <Button type="button" variant="outline" onClick={removePreferredBluetoothPrinter}>
+                Remove Saved Printer
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void testPrint()}>
+                Print Test Receipt
+              </Button>
+            </div>
+
+            <label className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+              <span>Auto reconnect saved Bluetooth printer</span>
+              <input
+                type="checkbox"
+                checked={form.bluetoothAutoReconnect}
+                onChange={(event) => updateDraft({ bluetoothAutoReconnect: event.target.checked })}
+              />
+            </label>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nearby Bluetooth Printers</p>
+              {discoveredPrinters.length ? (
+                <div className="space-y-2">
+                  {discoveredPrinters.map((printer) => {
+                    const active =
+                      selectedPrinter?.id === printer.id ||
+                      (selectedPrinter?.macAddress && selectedPrinter.macAddress === printer.macAddress);
+
+                    return (
+                      <div
+                        key={printer.id}
+                        className={`rounded-md border p-2 text-xs ${
+                          active ? "border-brand-400 bg-brand-50" : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-800">{printer.name}</p>
+                            <p className="text-slate-500">{printer.macAddress || printer.id}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void connectBluetoothPrinter(printer)}
+                            disabled={isConnecting}
+                          >
+                            {isConnecting && active ? "Connecting..." : "Connect"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-md border border-dashed border-slate-300 p-2 text-xs text-slate-500">
+                  No printers discovered yet. Tap Scan Devices.
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Default Printer Name</label>
+                <Input
+                  value={form.bluetoothPrinterName}
+                  onChange={(event) => updateDraft({ bluetoothPrinterName: event.target.value })}
+                  placeholder="BP-210 / XPrinter XP-58"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Default Printer MAC</label>
+                <Input
+                  value={form.bluetoothPrinterMac}
+                  onChange={(event) => updateDraft({ bluetoothPrinterMac: event.target.value })}
+                  placeholder="AA:BB:CC:DD:EE:FF"
+                />
+              </div>
+            </div>
           </div>
         </details>
 

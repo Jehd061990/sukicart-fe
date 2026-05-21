@@ -54,6 +54,13 @@ export interface StorePrintingConfig {
   paperSize?: "58mm" | "80mm";
   autoPrint?: boolean;
   desktopPrinterName?: string;
+  bluetoothPrinter?: {
+    printerName: string;
+    printerMac: string;
+    connectionType: "bluetooth";
+    paperSize: "58mm" | "80mm";
+    autoReconnect: boolean;
+  } | null;
 }
 
 export interface StoreTypeConfig {
