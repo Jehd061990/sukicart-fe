@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
@@ -12,14 +12,18 @@ import { DiscountModal } from "@/components/pos/DiscountModal";
 import { ProductCard } from "@/components/pos/ProductCard";
 import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { Input } from "@/components/ui/input";
-import { useIsMobile } from "@/hooks/use-is-mobile";
 import { normalizeProductImageUrl } from "@/lib/images/product-image";
 import { cacheProducts, getCachedProductsPayload } from "@/lib/offline/products-cache";
 import { productService } from "@/lib/api/services/product.service";
 import { posService } from "@/lib/api/services/pos.service";
+import { usePOSDeviceProfile } from "@/hooks/pos/use-device-profile";
 import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
+import { printerService } from "@/lib/pos-printing/printer-service";
+import { openReceiptPrintWindow } from "@/lib/pos-printing/receipt-template";
+import { ReceiptPayload } from "@/lib/pos-printing/types";
 import { useAuthStore } from "@/store/auth.store";
 import { usePOSCartStore } from "@/store/pos-cart.store";
+import { usePOSPrintStore } from "@/store/pos-print.store";
 import { Product } from "@/types/product";
 import { ScannerMode } from "@/types/store-config";
 
@@ -103,7 +107,6 @@ const barcodeVariants = (value: string) => {
 };
 
 export default function POSPage() {
-  const isMobile = useIsMobile() ?? false;
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [category, setCategory] = useState("all");
@@ -120,8 +123,11 @@ export default function POSPage() {
   const [detailsVariant, setDetailsVariant] = useState("Regular");
   const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
   const [showScannerPanel, setShowScannerPanel] = useState(true);
+  const [printActionMessage, setPrintActionMessage] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const role = useAuthStore((state) => state.user?.role);
+  const cashierName = useAuthStore((state) => state.user?.name || "POS Cashier");
 
   const items = usePOSCartStore((state) => state.items);
   const addItem = usePOSCartStore((state) => state.addItem);
@@ -129,6 +135,14 @@ export default function POSPage() {
   const setQuantity = usePOSCartStore((state) => state.setQuantity);
   const removeItem = usePOSCartStore((state) => state.removeItem);
   const clearCart = usePOSCartStore((state) => state.clearCart);
+
+  const latestPrintStatus = usePOSPrintStore((state) => state.latestPrintStatus);
+  const latestPrintMessage = usePOSPrintStore((state) => state.latestPrintMessage);
+  const failedReceipts = usePOSPrintStore((state) => state.failedReceipts);
+  const setLatestStatus = usePOSPrintStore((state) => state.setLatestStatus);
+  const enqueueFailedReceipt = usePOSPrintStore((state) => state.enqueueFailedReceipt);
+  const markRetried = usePOSPrintStore((state) => state.markRetried);
+  const removeFailedReceipt = usePOSPrintStore((state) => state.removeFailedReceipt);
 
   const productsQuery = useQuery({
     queryKey: ["products"],
@@ -150,6 +164,20 @@ export default function POSPage() {
   });
 
   const storeConfig = storeConfigQuery.data?.config;
+  const printingConfig = storeConfig?.printing || {};
+  const preferredPrinterAdapter = printingConfig.preferredAdapter || undefined;
+  const configuredPaperSize = printingConfig.paperSize || undefined;
+  const configuredPrinterName = String(printingConfig.desktopPrinterName || "").trim() || undefined;
+  const autoPrintEnabled = printingConfig.autoPrint !== false;
+  const preferredPOSMode = storeConfigQuery.data?.store?.preferredPOSMode || "desktop";
+  const runtimeProfile = usePOSDeviceProfile(preferredPOSMode);
+  const isCompactLayout =
+    runtimeProfile.runtimeMode === "android" ||
+    runtimeProfile.runtimeMode === "ios" ||
+    runtimeProfile.runtimeMode === "mobile" ||
+    runtimeProfile.runtimeMode === "pwa";
+  const isTabletLayout = runtimeProfile.runtimeMode === "tablet";
+  const isDesktopLayout = runtimeProfile.runtimeMode === "desktop";
   const barcodeEnabled = Boolean(storeConfig?.features?.barcodeScanning);
   const showBarcodeScannerPanel = Boolean(storeConfig?.uiBehavior?.showBarcodeScanner);
   const categoryLabelByKey = useMemo(() => {
@@ -327,11 +355,76 @@ export default function POSPage() {
     return false;
   };
 
+  useEffect(() => {
+    if (!isDesktopLayout) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+
+      if (event.key === "F9") {
+        event.preventDefault();
+        if (items.length > 0) {
+          setCheckoutOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDesktopLayout, items.length]);
+
+  const buildReceiptPayload = (orderId: string, itemSnapshot: typeof items): ReceiptPayload => {
+    return {
+      receiptId: `${orderId}-${Date.now()}`,
+      orderId,
+      createdAt: new Date().toISOString(),
+      sellerName: storeConfigQuery.data?.store?.name || "SukiGo Store",
+      cashierName,
+      deviceName: runtimeProfile.runtimeMode.toUpperCase(),
+      paperSize: configuredPaperSize || (runtimeProfile.isMobile ? "58mm" : "80mm"),
+      items: itemSnapshot.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      subtotal,
+      discount: effectiveDiscount,
+      total,
+    };
+  };
+
+  const runReceiptPrint = async (receipt: ReceiptPayload) => {
+    setLatestStatus("PRINTING", "Sending receipt to printer...");
+
+    const result = await printerService.printReceipt(receipt, {
+      runtimeProfile,
+      preferBluetooth: runtimeProfile.isAndroid,
+      preferredAdapter: preferredPrinterAdapter,
+      printerName: configuredPrinterName,
+    });
+
+    setLatestStatus(result.status, result.message);
+
+    if (result.status !== "PRINT_SUCCESS") {
+      enqueueFailedReceipt(receipt, result.status, result.message);
+      setPrintActionMessage("Receipt printing failed. Retry?");
+      return;
+    }
+
+    setPrintActionMessage("Receipt printed successfully.");
+  };
+
   const submitMutation = useMutation({
     mutationFn: async () => {
+      const itemSnapshot = [...items];
       const payload = {
         paymentMethod: "cash" as const,
-        items: items.map((item) => ({
+        items: itemSnapshot.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
           variant: item.variant,
@@ -341,11 +434,18 @@ export default function POSPage() {
       };
 
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        await enqueuePOSOrder({
-          ...payload,
-          createdAt: Date.now(),
-        }, "offline");
-        return { queuedOffline: true, orderId: `offline-${Date.now()}` };
+        await enqueuePOSOrder(
+          {
+            ...payload,
+            createdAt: Date.now(),
+          },
+          "offline",
+        );
+        return {
+          queuedOffline: true,
+          orderId: `offline-${Date.now()}`,
+          itemSnapshot,
+        };
       }
 
       try {
@@ -353,30 +453,52 @@ export default function POSPage() {
         return {
           queuedOffline: false,
           orderId: result.order._id,
+          itemSnapshot,
         };
       } catch (error) {
         if (axios.isAxiosError(error) && !error.response) {
-          await enqueuePOSOrder({
-            ...payload,
-            createdAt: Date.now(),
-          }, "network-failure");
-          return { queuedOffline: true, orderId: `offline-${Date.now()}` };
+          await enqueuePOSOrder(
+            {
+              ...payload,
+              createdAt: Date.now(),
+            },
+            "network-failure",
+          );
+          return {
+            queuedOffline: true,
+            orderId: `offline-${Date.now()}`,
+            itemSnapshot,
+          };
         }
 
         throw error;
       }
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
+      const receipt = buildReceiptPayload(result.orderId, result.itemSnapshot);
+
       clearCart();
       setDiscountAmount(0);
       setCheckoutOpen(false);
+
       if (result.queuedOffline) {
         setScannerStatus("Offline: order queued for sync");
         setScannerStatusTone("warning");
+        enqueueFailedReceipt(receipt, "PRINTER_OFFLINE", "Order queued offline. Print later.");
       } else {
         setScannerStatus(`Order created: ${result.orderId}`);
         setScannerStatusTone("success");
+        if (autoPrintEnabled) {
+          await runReceiptPrint(receipt);
+        } else {
+          setLatestStatus("PRINT_SUCCESS", "Receipt created. Auto print is disabled in settings.");
+        }
       }
+
+      if (runtimeProfile.isAndroid && typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(25);
+      }
+
       productsQuery.refetch();
     },
     onError: (error: unknown) => {
@@ -388,6 +510,59 @@ export default function POSPage() {
       setScannerStatusTone("error");
     },
   });
+
+  const retryFailedReceipt = async (receiptId: string) => {
+    const failed = failedReceipts.find((entry) => entry.id === receiptId);
+    if (!failed) {
+      return;
+    }
+
+    setLatestStatus("PRINTING", "Retrying queued receipt...");
+    const result = await printerService.printReceipt(failed.receipt, {
+      runtimeProfile,
+      preferBluetooth: runtimeProfile.isAndroid,
+      preferredAdapter: preferredPrinterAdapter,
+      printerName: configuredPrinterName,
+    });
+
+    markRetried(failed.id, result.status, result.message);
+    setLatestStatus(result.status, result.message);
+
+    if (result.status === "PRINT_SUCCESS") {
+      removeFailedReceipt(failed.id);
+    }
+  };
+
+  const reconnectPrinter = async () => {
+    const adapter = printerService.getPreferredAdapter(
+      runtimeProfile,
+      runtimeProfile.isAndroid,
+      preferredPrinterAdapter,
+    );
+    setLatestStatus("PRINTING", `Reconnecting ${adapter} printer...`);
+    const result = await printerService.connectPrinter({
+      runtimeProfile,
+      preferBluetooth: runtimeProfile.isAndroid,
+      preferredAdapter: preferredPrinterAdapter,
+      printerName: configuredPrinterName,
+    });
+    setLatestStatus(result.status, result.message);
+  };
+
+  const saveReceiptAsPdf = (receiptId: string) => {
+    const failed = failedReceipts.find((entry) => entry.id === receiptId);
+    if (!failed) {
+      return;
+    }
+
+    const opened = openReceiptPrintWindow(failed.receipt);
+    if (!opened) {
+      setLatestStatus("PRINT_FAILED", "Could not open print preview for PDF save");
+      return;
+    }
+
+    setLatestStatus("PRINT_SUCCESS", "Receipt preview opened. Choose Save as PDF.");
+  };
 
   if (role !== "POS") {
     return (
@@ -407,14 +582,113 @@ export default function POSPage() {
   }
 
   return (
-    <div className="relative h-full overflow-hidden bg-slate-100 pb-24 xl:pb-0">
+    <div
+      className={`relative h-full overflow-hidden bg-slate-100 ${
+        isCompactLayout ? "pb-28" : "pb-6"
+      }`}
+    >
       {flashMessage ? (
         <div className="fixed right-4 top-4 z-50 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-lg transition">
           {flashMessage}
         </div>
       ) : null}
 
-      <div className="grid h-full gap-4 p-3 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <div className="px-3 pt-3">
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Runtime: <strong>{runtimeProfile.runtimeMode.toUpperCase()}</strong> | Input: {runtimeProfile.inputMethod}
+            </span>
+            <span>
+              Printer: <strong>{printerService.getPreferredAdapter(runtimeProfile, runtimeProfile.isAndroid, preferredPrinterAdapter)}</strong>
+            </span>
+            <span>
+              Paper: <strong>{configuredPaperSize || "auto"}</strong>
+            </span>
+          </div>
+          {latestPrintStatus ? (
+            <p className="mt-1 text-xs text-slate-600">
+              {latestPrintStatus}: {latestPrintMessage}
+            </p>
+          ) : null}
+          {printActionMessage ? <p className="mt-1 text-xs text-amber-700">{printActionMessage}</p> : null}
+        </div>
+      </div>
+
+      {failedReceipts.length > 0 ? (
+        <div className="mx-3 mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">Receipt printing failed. Retry?</p>
+          <div className="mt-2 space-y-2">
+            {failedReceipts.slice(0, 2).map((entry) => (
+              <div key={entry.id} className="rounded-lg border border-amber-200 bg-white p-2 text-xs">
+                <p className="font-medium text-slate-700">{entry.receipt.orderId}</p>
+                <p className="text-slate-500">{entry.reason}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void retryFailedReceipt(entry.id)}
+                    className="rounded-md bg-emerald-600 px-2 py-1 font-medium text-white"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveReceiptAsPdf(entry.id)}
+                    className="rounded-md bg-slate-700 px-2 py-1 font-medium text-white"
+                  >
+                    Save PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void reconnectPrinter()}
+                    className="rounded-md bg-amber-600 px-2 py-1 font-medium text-white"
+                  >
+                    Reconnect Printer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        className={`grid h-full gap-4 p-3 ${
+          isDesktopLayout
+            ? "xl:grid-cols-[220px_minmax(0,1fr)_390px]"
+            : isTabletLayout
+              ? "md:grid-cols-[minmax(0,1fr)_330px]"
+              : ""
+        }`}
+      >
+        {isDesktopLayout ? (
+          <aside className="hidden rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 xl:block">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Desktop POS</p>
+            <nav className="mt-3 space-y-2 text-sm">
+              <button
+                type="button"
+                onClick={() => searchInputRef.current?.focus()}
+                className="w-full rounded-lg bg-slate-100 px-3 py-2 text-left font-medium text-slate-700"
+              >
+                Quick Search (Ctrl+F)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCheckoutOpen(true)}
+                className="w-full rounded-lg bg-brand-600 px-3 py-2 text-left font-medium text-white"
+              >
+                Checkout (F9)
+              </button>
+              <Link
+                href="/scanner"
+                className="block rounded-lg bg-slate-100 px-3 py-2 font-medium text-slate-700"
+              >
+                Camera Scanner
+              </Link>
+            </nav>
+          </aside>
+        ) : null}
+
         <section className="flex min-h-0 flex-col gap-3">
           <div className="sticky top-0 z-20 space-y-2 rounded-2xl bg-slate-100/95 pb-2 backdrop-blur md:top-1">
             <div className="space-y-1 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
@@ -425,16 +699,24 @@ export default function POSPage() {
                 Point of Sale
               </h1>
 
-              {!isMobile && (
+              {!isCompactLayout && (
                 <p className="ml-5 text-sm text-slate-600">
                   Fast cart building for front-counter checkout.
                 </p>
               )}
-              
 
-              <div className="mt-1 grid gap-2 xl:grid-cols-[minmax(0,1fr)_220px]">
+              <p className="ml-5 text-xs font-medium uppercase tracking-wide text-slate-500">
+                Optimized for {runtimeProfile.runtimeMode}
+              </p>
+
+              <div
+                className={`mt-1 grid gap-2 ${
+                  isCompactLayout ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1fr)_220px]"
+                }`}
+              >
                 <Input
                   autoFocus
+                  ref={searchInputRef}
                   className="h-11 border-slate-200 bg-slate-50 text-base focus-visible:border-brand-500 focus-visible:ring-brand-100"
                   placeholder="Search products or scan barcode"
                   value={search}
@@ -464,7 +746,7 @@ export default function POSPage() {
                 </select>
               </div>
 
-              {barcodeEnabled && showBarcodeScannerPanel && isMobile ? (
+              {barcodeEnabled && showBarcodeScannerPanel && isCompactLayout ? (
                 <Link
                   href="/scanner"
                   className="flex h-12 items-center justify-center rounded-2xl bg-brand-600 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
@@ -473,7 +755,7 @@ export default function POSPage() {
                 </Link>
               ) : null}
 
-              {!isMobile && (
+              {!isCompactLayout && (
                 <button
                   type="button"
                   onClick={() => setShowScannerPanel((prev) => !prev)}
@@ -486,7 +768,7 @@ export default function POSPage() {
               {barcodeEnabled &&
               showBarcodeScannerPanel &&
               showScannerPanel &&
-              !isMobile ? (
+              !isCompactLayout ? (
                 <div className="rounded-2xl bg-slate-50 p-2 ring-1 ring-slate-200">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <div
@@ -533,7 +815,15 @@ export default function POSPage() {
 
           <SimplebarScroll className="min-h-0 flex-1 pr-1">
             {productsQuery.isLoading ? (
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-4">
+              <div
+                className={`grid gap-3 ${
+                  isCompactLayout
+                    ? "grid-cols-2"
+                    : isTabletLayout
+                      ? "grid-cols-3"
+                      : "grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+                }`}
+              >
                 {Array.from({ length: 8 }).map((_, index) => (
                   <div
                     key={index}
@@ -546,7 +836,15 @@ export default function POSPage() {
                 No products match your filters.
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-4">
+              <div
+                className={`grid gap-3 ${
+                  isCompactLayout
+                    ? "grid-cols-2"
+                    : isTabletLayout
+                      ? "grid-cols-3"
+                      : "grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+                }`}
+              >
                 {filteredProducts.map((product) => (
                   <ProductCard
                     key={product._id}
@@ -572,7 +870,11 @@ export default function POSPage() {
           </SimplebarScroll>
         </section>
 
-        <aside className="hidden self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+        <aside
+          className={`${
+            isCompactLayout ? "hidden" : "flex"
+          } self-start rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 h-full min-h-0 flex-col`}
+        >
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">
               Current Cart
@@ -635,11 +937,35 @@ export default function POSPage() {
         </aside>
       </div>
 
-      <CartBar
-        itemCount={itemCount}
-        total={total}
-        onOpenCart={() => setCheckoutOpen(true)}
-      />
+      {isCompactLayout ? (
+        <CartBar
+          itemCount={itemCount}
+          total={total}
+          onOpenCart={() => setCheckoutOpen(true)}
+        />
+      ) : null}
+
+      {isCompactLayout ? (
+        <nav className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-2xl bg-slate-900 px-3 py-2 text-xs text-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => searchInputRef.current?.focus()}
+            className="rounded-md bg-slate-700 px-3 py-2"
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            onClick={() => setCheckoutOpen(true)}
+            className="rounded-md bg-brand-600 px-3 py-2 font-semibold"
+          >
+            Cart ({itemCount})
+          </button>
+          <Link href="/scanner" className="rounded-md bg-slate-700 px-3 py-2">
+            Scan
+          </Link>
+        </nav>
+      ) : null}
 
       <CheckoutModal
         open={checkoutOpen}

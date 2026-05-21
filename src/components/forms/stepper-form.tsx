@@ -15,6 +15,7 @@ import { SELLER_PENDING_LOGIN_KEY } from "@/constants/seller-pending";
 import { useSellerRegistrationStore } from "@/store/seller-registration.store";
 import {
   normalizeSellerStoreType,
+  PREFERRED_POS_MODE_OPTIONS,
   sellerRegistrationSchema,
   SellerRegistrationFormValues,
   STORE_TYPE_OPTIONS,
@@ -30,7 +31,7 @@ const STEP_TITLES = [
 
 const STEP_FIELD_NAMES: Array<Array<keyof SellerRegistrationFormValues>> = [
   ["fullName", "phoneNumber", "email", "password"],
-  ["storeName", "storeType", "marketLocation", "exactAddress"],
+  ["storeName", "storeType", "preferredPOSMode", "marketLocation", "exactAddress"],
   ["dtiPermit", "validId"],
   ["handleOwnDelivery", "usePlatformRiders"],
   ["acceptTerms"],
@@ -62,6 +63,7 @@ export function StepperForm() {
       password: draft.password,
       storeName: draft.storeName,
       storeType: normalizeSellerStoreType(draft.storeType),
+      preferredPOSMode: draft.preferredPOSMode,
       marketLocation: draft.marketLocation,
       exactAddress: draft.exactAddress,
       dtiPermit: null,
@@ -84,6 +86,7 @@ export function StepperForm() {
       password: values.password || "",
       storeName: values.storeName || "",
       storeType: normalizeSellerStoreType(values.storeType),
+      preferredPOSMode: values.preferredPOSMode || "desktop",
       marketLocation: values.marketLocation || "",
       exactAddress: values.exactAddress || "",
       handleOwnDelivery: Boolean(values.handleOwnDelivery),
@@ -226,6 +229,14 @@ export function StepperForm() {
             error={errors.storeType}
             required
             options={STORE_TYPE_OPTIONS}
+          />
+          <SelectField
+            label="What device will you mainly use for your POS?"
+            name="preferredPOSMode"
+            register={register}
+            error={errors.preferredPOSMode}
+            required
+            options={PREFERRED_POS_MODE_OPTIONS}
           />
           <InputField
             label="Market Location"

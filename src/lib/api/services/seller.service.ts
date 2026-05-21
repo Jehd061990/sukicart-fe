@@ -11,6 +11,7 @@ export const sellerService = {
     formData.append("password", payload.password);
     formData.append("storeName", payload.storeName);
     formData.append("storeType", payload.storeType);
+    formData.append("preferredPOSMode", payload.preferredPOSMode);
     formData.append("marketLocation", payload.marketLocation || "");
     formData.append("exactAddress", payload.exactAddress || "");
     formData.append("handleOwnDelivery", String(payload.handleOwnDelivery));

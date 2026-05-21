@@ -10,12 +10,29 @@ export const STORE_TYPE_VALUES = [
 
 export type SellerStoreType = (typeof STORE_TYPE_VALUES)[number];
 
+export const PREFERRED_POS_MODE_VALUES = [
+  "desktop",
+  "android",
+  "ios",
+] as const;
+
+export type PreferredPOSMode = (typeof PREFERRED_POS_MODE_VALUES)[number];
+
 export const STORE_TYPE_OPTIONS: Array<{ label: string; value: SellerStoreType }> = [
   { label: "Grocery store", value: "grocery" },
   { label: "Pharmacy", value: "pharmacy" },
   { label: "Hardware store", value: "hardware" },
   { label: "Convenience store", value: "convenience" },
   { label: "General retail", value: "retail" },
+];
+
+export const PREFERRED_POS_MODE_OPTIONS: Array<{
+  label: string;
+  value: PreferredPOSMode;
+}> = [
+  { label: "Desktop / Laptop", value: "desktop" },
+  { label: "Android Phone / Tablet", value: "android" },
+  { label: "iPhone / iPad", value: "ios" },
 ];
 
 const LEGACY_TO_CANONICAL_STORE_TYPE: Record<string, SellerStoreType> = {
@@ -56,6 +73,9 @@ export const sellerRegistrationSchema = z
     storeType: z.enum(STORE_TYPE_VALUES, {
       message: "Store Type is required",
     }),
+    preferredPOSMode: z.enum(PREFERRED_POS_MODE_VALUES, {
+      message: "Preferred POS mode is required",
+    }),
     marketLocation: z.string().optional(),
     exactAddress: z.string().optional(),
     dtiPermit: z.instanceof(File).optional().nullable(),
@@ -92,6 +112,7 @@ export const sellerRegistrationDraftDefaults: SellerRegistrationDraft = {
   password: "",
   storeName: "",
   storeType: "grocery",
+  preferredPOSMode: "desktop",
   marketLocation: "",
   exactAddress: "",
   handleOwnDelivery: false,

@@ -5,6 +5,8 @@ export type StoreType =
   | "convenience"
   | "retail";
 
+export type PreferredPOSMode = "desktop" | "android" | "ios";
+
 export type ScannerMode = "camera" | "hardware" | "manual";
 export type StoreCategoryKey = "vegetables" | "meat" | "fish";
 export type CategoryThumbnailShape = "circle" | "rounded";
@@ -47,6 +49,13 @@ export interface StoreConfigBusinessRules {
   maxLineItems: number;
 }
 
+export interface StorePrintingConfig {
+  preferredAdapter?: "browser" | "bluetooth" | "airprint" | "local-bridge";
+  paperSize?: "58mm" | "80mm";
+  autoPrint?: boolean;
+  desktopPrinterName?: string;
+}
+
 export interface StoreTypeConfig {
   label: string;
   modules: string[];
@@ -56,6 +65,7 @@ export interface StoreTypeConfig {
   };
   businessRules: StoreConfigBusinessRules;
   uiBehavior: StoreConfigUIBehavior;
+  printing?: StorePrintingConfig;
 }
 
 export interface StoreConfigResponse {
@@ -63,6 +73,7 @@ export interface StoreConfigResponse {
     id: string;
     name: string;
     storeType: StoreType;
+    preferredPOSMode?: PreferredPOSMode;
   };
   config: StoreTypeConfig;
   supportedStoreTypes: StoreType[];
@@ -70,5 +81,6 @@ export interface StoreConfigResponse {
 
 export interface UpdateStoreConfigPayload {
   storeType?: StoreType;
+  preferredPOSMode?: PreferredPOSMode;
   configOverrides?: Partial<StoreTypeConfig> | null;
 }

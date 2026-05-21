@@ -47,8 +47,25 @@ function useCartOfflinePersistence() {
 
 export function PWARuntime() {
   useServiceWorkerRegistration();
-  useSyncQueue();
+  const { processQueue } = useSyncQueue();
   useCartOfflinePersistence();
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) {
+      return;
+    }
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "SUKICART_SYNC_QUEUE") {
+        void processQueue();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onMessage);
+    };
+  }, [processQueue]);
 
   return (
     <>
