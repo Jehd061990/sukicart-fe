@@ -698,7 +698,9 @@ export default function POSPage() {
   };
 
   const saveDeviceDefaultPrinter = () => {
-    if (!printerManager.selectedPrinter || !storeConfig) {
+    const target = printerManager.selectedPrinter;
+
+    if (!target || !storeConfig) {
       setPrintActionMessage("No printer selected to save.");
       return;
     }
@@ -707,7 +709,6 @@ export default function POSPage() {
       setIsSavingPrinterDefault(true);
 
       try {
-        const target = printerManager.selectedPrinter;
         await posService.updateStoreConfig({
           configOverrides: {
             printing: {
@@ -1306,7 +1307,7 @@ export default function POSPage() {
         />
       ) : null}
 
-      {isCompactLayout ? (
+      {/* {isCompactLayout ? (
         <nav className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-2xl bg-slate-900 px-3 py-2 text-xs text-white shadow-lg">
           <button
             type="button"
@@ -1326,7 +1327,7 @@ export default function POSPage() {
             Scan
           </Link>
         </nav>
-      ) : null}
+      ) : null} */}
 
       <CheckoutModal
         open={checkoutOpen}
