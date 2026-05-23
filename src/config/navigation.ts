@@ -1,5 +1,6 @@
 import {
   Building2,
+  Bluetooth,
   ChartColumnIncreasing,
   ShieldCheck,
   LucideIcon,
@@ -135,7 +136,10 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     title: "POS Modules",
     role: "POS",
     routeBase: "/pos",
-    modules: [{ label: "Order Dashboard", href: "/pos", icon: HandCoins }],
+    modules: [
+      { label: "Order Dashboard", href: "/pos", icon: HandCoins },
+      { label: "Printer Module", href: "/pos/printer", icon: Bluetooth },
+    ],
   },
 ];
 
