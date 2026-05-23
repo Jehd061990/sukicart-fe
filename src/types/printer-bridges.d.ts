@@ -94,6 +94,39 @@ declare global {
   interface Window {
     qz?: QZBridge;
     Capacitor?: CapacitorRuntime;
+    bluetoothSerial?: {
+      list: (
+        onSuccess: (devices: unknown) => void,
+        onError: (error: unknown) => void,
+      ) => void;
+      discoverUnpaired?: (
+        onSuccess: (devices: unknown) => void,
+        onError: (error: unknown) => void,
+      ) => void;
+      connect: (
+        address: string,
+        onSuccess: (data?: unknown) => void,
+        onError: (error: unknown) => void,
+      ) => void;
+      disconnect: (
+        onSuccess: () => void,
+        onError: (error: unknown) => void,
+      ) => void;
+      isConnected: (
+        onSuccess: () => void,
+        onError: (error: unknown) => void,
+      ) => void;
+      write?: (
+        data: string,
+        onSuccess: () => void,
+        onError: (error: unknown) => void,
+      ) => void;
+      writeBinary?: (
+        data: string,
+        onSuccess: () => void,
+        onError: (error: unknown) => void,
+      ) => void;
+    };
   }
 }
 

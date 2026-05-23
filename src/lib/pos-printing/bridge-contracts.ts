@@ -25,12 +25,132 @@ type BluetoothBridgeLike = {
   [key: string]: unknown;
 };
 
+type CordovaBluetoothSerialLike = {
+  list: (
+    onSuccess: (devices: unknown) => void,
+    onError: (error: unknown) => void,
+  ) => void;
+  discoverUnpaired?: (
+    onSuccess: (devices: unknown) => void,
+    onError: (error: unknown) => void,
+  ) => void;
+  connect: (
+    address: string,
+    onSuccess: (data?: unknown) => void,
+    onError: (error: unknown) => void,
+  ) => void;
+  disconnect: (
+    onSuccess: () => void,
+    onError: (error: unknown) => void,
+  ) => void;
+  isConnected: (
+    onSuccess: () => void,
+    onError: (error: unknown) => void,
+  ) => void;
+  write?: (
+    data: string,
+    onSuccess: () => void,
+    onError: (error: unknown) => void,
+  ) => void;
+  writeBinary?: (
+    data: string,
+    onSuccess: () => void,
+    onError: (error: unknown) => void,
+  ) => void;
+};
+
 type WebBluetoothLikeDevice = {
   id: string;
   name?: string | null;
 };
 
 let selectedWebBluetoothDevice: WebBluetoothLikeDevice | null = null;
+
+const asPromise = <T>(
+  executor: (
+    resolve: (value: T | PromiseLike<T>) => void,
+    reject: (reason?: unknown) => void,
+  ) => void,
+) => new Promise<T>(executor);
+
+const getCordovaBluetoothSerial = (): CordovaBluetoothSerialLike | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const serial = (window as Window & { bluetoothSerial?: CordovaBluetoothSerialLike })
+    .bluetoothSerial;
+  return serial || null;
+};
+
+const createCordovaBluetoothBridge = (): BluetoothBridgeLike | null => {
+  const serial = getCordovaBluetoothSerial();
+  if (!serial) {
+    return null;
+  }
+
+  const listDevices = () =>
+    asPromise<unknown>((resolve, reject) => {
+      serial.list(resolve, reject);
+    });
+
+  const discoverDevices = () =>
+    asPromise<unknown>((resolve, reject) => {
+      if (!serial.discoverUnpaired) {
+        resolve([]);
+        return;
+      }
+
+      serial.discoverUnpaired(resolve, reject);
+    });
+
+  const connect = (args?: { macAddress?: string; address?: string; id?: string }) => {
+    const target = args?.macAddress || args?.address || args?.id;
+    if (!target) {
+      return Promise.reject(new Error("Bluetooth address is required for connect"));
+    }
+
+    return asPromise<void>((resolve, reject) => {
+      serial.connect(target, () => resolve(), reject);
+    });
+  };
+
+  const disconnect = () =>
+    asPromise<void>((resolve, reject) => {
+      serial.disconnect(resolve, reject);
+    });
+
+  const isConnected = () =>
+    asPromise<{ connected: boolean }>((resolve) => {
+      serial.isConnected(
+        () => resolve({ connected: true }),
+        () => resolve({ connected: false }),
+      );
+    });
+
+  const printEscPos = (args: { data: string }) => {
+    const writer = serial.writeBinary || serial.write;
+    if (!writer) {
+      return Promise.reject(new Error("No write method in bluetoothSerial"));
+    }
+
+    return asPromise<void>((resolve, reject) => {
+      writer(args.data, resolve, reject);
+    });
+  };
+
+  return {
+    scanDevices: listDevices,
+    listPairedDevices: listDevices,
+    listBondedDevices: listDevices,
+    getPairedDevices: listDevices,
+    discoverDevices,
+    connect,
+    disconnect,
+    isConnected,
+    printEscPos,
+  };
+};
 
 export const getQZBridge = () => {
   if (typeof window === "undefined") {
@@ -52,6 +172,14 @@ const resolveAndroidBluetoothBridge = (): {
   }
 
   const plugins = window.Capacitor?.Plugins;
+  const cordovaBridge = createCordovaBluetoothBridge();
+  if (cordovaBridge) {
+    return {
+      bridge: cordovaBridge,
+      pluginName: "cordova-plugin-bluetooth-serial",
+    };
+  }
+
   const known = plugins?.SukiBluetoothPrinter || plugins?.BluetoothPrinter;
   if (known) {
     return {

@@ -70,7 +70,7 @@ export function PWARuntime() {
   return (
     <>
       <OfflineStatusIndicator />
-      <InstallAppButton />
+      {/* <InstallAppButton /> */}
     </>
   );
 }
