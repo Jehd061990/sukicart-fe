@@ -59,6 +59,20 @@ type CordovaBluetoothSerialLike = {
   ) => void;
 };
 
+type CordovaAndroidPermissionsLike = {
+  PERMISSION?: Record<string, string>;
+  hasPermission: (
+    permission: string,
+    success: (result: { hasPermission?: boolean }) => void,
+    error: (reason: unknown) => void,
+  ) => void;
+  requestPermissions: (
+    permissions: string[],
+    success: (result: { hasPermission?: boolean }) => void,
+    error: (reason: unknown) => void,
+  ) => void;
+};
+
 type WebBluetoothLikeDevice = {
   id: string;
   name?: string | null;
@@ -81,6 +95,98 @@ const getCordovaBluetoothSerial = (): CordovaBluetoothSerialLike | null => {
   const serial = (window as Window & { bluetoothSerial?: CordovaBluetoothSerialLike })
     .bluetoothSerial;
   return serial || null;
+};
+
+const getCordovaAndroidPermissions = (): CordovaAndroidPermissionsLike | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return (
+    (window as Window & {
+      cordova?: {
+        plugins?: {
+          permissions?: CordovaAndroidPermissionsLike;
+        };
+      };
+    }).cordova?.plugins?.permissions || null
+  );
+};
+
+const hasCordovaPermission = async (
+  permissions: CordovaAndroidPermissionsLike,
+  permission: string,
+) =>
+  asPromise<boolean>((resolve) => {
+    permissions.hasPermission(
+      permission,
+      (result) => resolve(Boolean(result?.hasPermission)),
+      () => resolve(false),
+    );
+  });
+
+const requestCordovaPermissions = async (
+  permissions: CordovaAndroidPermissionsLike,
+  requested: string[],
+) =>
+  asPromise<boolean>((resolve) => {
+    permissions.requestPermissions(
+      requested,
+      (result) => resolve(Boolean(result?.hasPermission)),
+      () => resolve(false),
+    );
+  });
+
+const ensureCordovaAndroidBluetoothPermissions = async () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const isNative =
+    typeof window.Capacitor?.isNativePlatform === "function"
+      ? Boolean(window.Capacitor.isNativePlatform())
+      : false;
+
+  if (!isNative) {
+    return;
+  }
+
+  const permissions = getCordovaAndroidPermissions();
+  if (!permissions) {
+    return;
+  }
+
+  const manifestPermissions = permissions.PERMISSION || {};
+  const androidVersion = Number.parseInt((navigator.userAgent.match(/Android\s(\d+)/i)?.[1] || "0"), 10);
+
+  const bluetoothScan =
+    manifestPermissions.BLUETOOTH_SCAN || "android.permission.BLUETOOTH_SCAN";
+  const bluetoothConnect =
+    manifestPermissions.BLUETOOTH_CONNECT || "android.permission.BLUETOOTH_CONNECT";
+  const fineLocation =
+    manifestPermissions.ACCESS_FINE_LOCATION || "android.permission.ACCESS_FINE_LOCATION";
+
+  const required =
+    androidVersion >= 12
+      ? [bluetoothScan, bluetoothConnect]
+      : [fineLocation];
+
+  const missing: string[] = [];
+  for (const permission of required) {
+    const granted = await hasCordovaPermission(permissions, permission);
+    if (!granted) {
+      missing.push(permission);
+    }
+  }
+
+  if (!missing.length) {
+    return;
+  }
+
+  const granted = await requestCordovaPermissions(permissions, missing);
+  if (!granted) {
+    throw new Error("Bluetooth permissions were denied. Allow Nearby devices permission and try again.");
+  }
 };
 
 const createCordovaBluetoothBridge = (): BluetoothBridgeLike | null => {
@@ -140,12 +246,30 @@ const createCordovaBluetoothBridge = (): BluetoothBridgeLike | null => {
   };
 
   return {
-    scanDevices: listDevices,
-    listPairedDevices: listDevices,
-    listBondedDevices: listDevices,
-    getPairedDevices: listDevices,
-    discoverDevices,
-    connect,
+    scanDevices: async () => {
+      await ensureCordovaAndroidBluetoothPermissions();
+      return listDevices();
+    },
+    listPairedDevices: async () => {
+      await ensureCordovaAndroidBluetoothPermissions();
+      return listDevices();
+    },
+    listBondedDevices: async () => {
+      await ensureCordovaAndroidBluetoothPermissions();
+      return listDevices();
+    },
+    getPairedDevices: async () => {
+      await ensureCordovaAndroidBluetoothPermissions();
+      return listDevices();
+    },
+    discoverDevices: async () => {
+      await ensureCordovaAndroidBluetoothPermissions();
+      return discoverDevices();
+    },
+    connect: async (args?: { macAddress?: string; address?: string; id?: string }) => {
+      await ensureCordovaAndroidBluetoothPermissions();
+      return connect(args);
+    },
     disconnect,
     isConnected,
     printEscPos,

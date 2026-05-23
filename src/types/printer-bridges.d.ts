@@ -94,6 +94,23 @@ declare global {
   interface Window {
     qz?: QZBridge;
     Capacitor?: CapacitorRuntime;
+    cordova?: {
+      plugins?: {
+        permissions?: {
+          PERMISSION?: Record<string, string>;
+          hasPermission: (
+            permission: string,
+            success: (result: { hasPermission?: boolean }) => void,
+            error: (reason: unknown) => void,
+          ) => void;
+          requestPermissions: (
+            permissions: string[],
+            success: (result: { hasPermission?: boolean }) => void,
+            error: (reason: unknown) => void,
+          ) => void;
+        };
+      };
+    };
     bluetoothSerial?: {
       list: (
         onSuccess: (devices: unknown) => void,

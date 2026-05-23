@@ -25,6 +25,7 @@
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cordova-plugin-android-permissions": "^1.1.5",
     "cordova-plugin-bluetooth-serial": "^0.4.7",
     "framer-motion": "^12.38.0",
     "html5-qrcode": "^2.3.8",
