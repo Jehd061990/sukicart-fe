@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const serverUrl = process.env.CAP_SERVER_URL;
