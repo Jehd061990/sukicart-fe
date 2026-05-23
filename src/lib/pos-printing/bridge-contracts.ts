@@ -25,6 +25,13 @@ type BluetoothBridgeLike = {
   [key: string]: unknown;
 };
 
+type WebBluetoothLikeDevice = {
+  id: string;
+  name?: string | null;
+};
+
+let selectedWebBluetoothDevice: WebBluetoothLikeDevice | null = null;
+
 export const getQZBridge = () => {
   if (typeof window === "undefined") {
     return null;
@@ -461,6 +468,11 @@ export const scanAndroidBluetoothPrinters = async () => {
         optionalServices: ["battery_service"],
       });
 
+      selectedWebBluetoothDevice = {
+        id: device.id,
+        name: device.name || null,
+      };
+
       const printer = normalizeBluetoothDevice({
         id: device.id,
         name: device.name || "Web Bluetooth Device",
@@ -492,6 +504,21 @@ export const scanAndroidBluetoothPrinters = async () => {
 export const connectAndroidBluetoothPrinter = async (printer?: ThermalPrinterDevice) => {
   const bridge = getAndroidBluetoothBridge();
   if (!bridge) {
+    const bluetooth = getWebBluetooth();
+    const requestedPrinterId = printer?.id || printer?.macAddress;
+    const canUseWebBluetoothSelection = Boolean(
+      bluetooth?.requestDevice &&
+        (selectedWebBluetoothDevice || requestedPrinterId),
+    );
+
+    if (canUseWebBluetoothSelection) {
+      return {
+        ok: true,
+        message:
+          "Web Bluetooth device selected. Direct classic Bluetooth connect is limited in browser/PWA; use native Android build for full bridge support.",
+      };
+    }
+
     return { ok: false, message: "Android Bluetooth printer bridge was not found" };
   }
 
