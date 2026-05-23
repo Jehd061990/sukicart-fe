@@ -8,7 +8,7 @@ type BluetoothBridgeLike = {
   isConnected?: () => Promise<{ connected: boolean }>;
   getConnectedDevice?: () => Promise<unknown>;
   printReceipt?: (args: { payload: ReceiptPayload }) => Promise<void>;
-  printEscPos?: (args: { data: string }) => Promise<void>;
+  printEscPos?: (args: { data?: string; bytes?: Uint8Array }) => Promise<void>;
   getPairedDevices?: () => Promise<unknown>;
   listPairedDevices?: () => Promise<unknown>;
   listBondedDevices?: () => Promise<unknown>;
@@ -48,12 +48,12 @@ type CordovaBluetoothSerialLike = {
     onError: (error: unknown) => void,
   ) => void;
   write?: (
-    data: string,
+    data: string | ArrayBuffer,
     onSuccess: () => void,
     onError: (error: unknown) => void,
   ) => void;
   writeBinary?: (
-    data: string,
+    data: string | ArrayBuffer,
     onSuccess: () => void,
     onError: (error: unknown) => void,
   ) => void;
@@ -234,14 +234,33 @@ const createCordovaBluetoothBridge = (): BluetoothBridgeLike | null => {
       );
     });
 
-  const printEscPos = (args: { data: string }) => {
+  const toLatin1String = (bytes: Uint8Array) => {
+    let out = "";
+    for (const value of bytes) {
+      out += String.fromCharCode(value);
+    }
+    return out;
+  };
+
+  const toArrayBuffer = (bytes: Uint8Array) => {
+    return Uint8Array.from(bytes).buffer;
+  };
+
+  const printEscPos = (args: { data?: string; bytes?: Uint8Array }) => {
     const writer = serial.writeBinary || serial.write;
     if (!writer) {
       return Promise.reject(new Error("No write method in bluetoothSerial"));
     }
 
+    const payload =
+      args.bytes && args.bytes.length
+        ? serial.writeBinary
+          ? toArrayBuffer(args.bytes)
+          : toLatin1String(args.bytes)
+        : args.data || "";
+
     return asPromise<void>((resolve, reject) => {
-      writer(args.data, resolve, reject);
+      writer(payload, resolve, reject);
     });
   };
 
@@ -846,7 +865,7 @@ export const printThroughAndroidBluetoothBridge = async (payload: ReceiptPayload
     const escpos = buildEscPosReceipt(payload);
 
     try {
-      await bridge.printEscPos({ data: escpos.base64 });
+      await bridge.printEscPos({ bytes: escpos.bytes });
       return { ok: true, message: "Printed ESC/POS through Android Bluetooth bridge" };
     } catch {
       await bridge.printEscPos({ data: toEscPosText(payload) });

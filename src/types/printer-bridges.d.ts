@@ -78,7 +78,7 @@ declare global {
     connect?: (args?: { macAddress?: string; address?: string; id?: string }) => Promise<void>;
     disconnect?: () => Promise<void>;
     printReceipt?: (args: { payload: ReceiptPayload }) => Promise<void>;
-    printEscPos?: (args: { data: string }) => Promise<void>;
+    printEscPos?: (args: { data?: string; bytes?: Uint8Array }) => Promise<void>;
   }
 
   interface CapacitorPluginsWithPrinter {
@@ -134,12 +134,12 @@ declare global {
         onError: (error: unknown) => void,
       ) => void;
       write?: (
-        data: string,
+        data: string | ArrayBuffer,
         onSuccess: () => void,
         onError: (error: unknown) => void,
       ) => void;
       writeBinary?: (
-        data: string,
+        data: string | ArrayBuffer,
         onSuccess: () => void,
         onError: (error: unknown) => void,
       ) => void;
