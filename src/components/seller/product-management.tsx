@@ -17,6 +17,7 @@ import {
   Product,
   ProductCategory,
   ProductStatus,
+  ProductTaxType,
   ProductUnit,
 } from "@/types/product";
 import { LazyInventoryImage } from "@/components/images/lazy-inventory-image";
@@ -25,6 +26,19 @@ import { SukiGoImageUploader } from "@/components/uploads/sukigo-image-uploader"
 const CATEGORY_OPTIONS: ProductCategory[] = ["vegetables", "meat", "fish"];
 const UNIT_OPTIONS: ProductUnit[] = ["kg", "pcs"];
 const STATUS_OPTIONS: ProductStatus[] = ["active", "inactive"];
+const TAX_OPTIONS: Array<{ value: ProductTaxType; label: string }> = [
+  { value: "VAT", label: "VAT 12%" },
+  { value: "VAT_EXEMPT", label: "VAT Exempt" },
+  { value: "ZERO_RATED", label: "Zero Rated" },
+  { value: "NON_VAT", label: "Non-VAT" },
+];
+
+const TAX_BADGE_CLASS: Record<ProductTaxType, string> = {
+  VAT: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  VAT_EXEMPT: "bg-blue-100 text-blue-700 border-blue-200",
+  ZERO_RATED: "bg-violet-100 text-violet-700 border-violet-200",
+  NON_VAT: "bg-slate-100 text-slate-700 border-slate-200",
+};
 
 const INITIAL_FORM: CreateProductPayload = {
   name: "",
@@ -37,6 +51,8 @@ const INITIAL_FORM: CreateProductPayload = {
   status: "active",
   image: "",
   images: [],
+  taxType: "VAT",
+  taxRate: 12,
 };
 
 export function ProductManagement() {
@@ -70,6 +86,36 @@ export function ProductManagement() {
   const expiryTrackingEnabled = Boolean(
     storeConfigQuery.data?.config?.features?.expiryTracking,
   );
+  const storeTaxConfig = storeConfigQuery.data?.config?.tax;
+
+  const categoryTaxDefaults = useMemo(() => {
+    return storeTaxConfig?.categoryDefaults || {};
+  }, [storeTaxConfig?.categoryDefaults]);
+
+  const resolveCategoryTaxDefault = (category: ProductCategory) => {
+    const categoryDefault = categoryTaxDefaults?.[category];
+    const businessTaxType = storeTaxConfig?.businessTaxType || "VAT";
+    const defaultVatRate = Number(storeTaxConfig?.defaultVatRate || 12);
+
+    if (businessTaxType === "NON_VAT" || storeTaxConfig?.enabled === false) {
+      return {
+        taxType: "NON_VAT" as ProductTaxType,
+        taxRate: 0,
+      };
+    }
+
+    if (categoryDefault) {
+      return {
+        taxType: categoryDefault.taxType,
+        taxRate: categoryDefault.taxType === "VAT" ? Number(categoryDefault.taxRate || defaultVatRate) : 0,
+      };
+    }
+
+    return {
+      taxType: "VAT" as ProductTaxType,
+      taxRate: defaultVatRate,
+    };
+  };
 
   const createMutation = useMutation({
     mutationFn: productService.create,
@@ -107,8 +153,13 @@ export function ProductManagement() {
   const pagination = productsQuery.data?.pagination;
 
   const openAddModal = () => {
+    const categoryDefaultTax = resolveCategoryTaxDefault(INITIAL_FORM.category);
     setEditingProduct(null);
-    setFormValues(INITIAL_FORM);
+    setFormValues({
+      ...INITIAL_FORM,
+      taxType: categoryDefaultTax.taxType,
+      taxRate: categoryDefaultTax.taxRate,
+    });
     setIsModalOpen(true);
   };
 
@@ -125,6 +176,8 @@ export function ProductManagement() {
       status: product.status,
       image: product.image || "",
       images: product.images || [],
+      taxType: product.taxType || "NON_VAT",
+      taxRate: Number(product.taxRate || 0),
     });
     setIsModalOpen(true);
   };
@@ -132,15 +185,20 @@ export function ProductManagement() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const payload: CreateProductPayload = {
+      ...formValues,
+      taxRate: formValues.taxType === "VAT" ? Number(formValues.taxRate || 0) : 0,
+    };
+
     if (editingProduct) {
       await updateMutation.mutateAsync({
         productId: editingProduct._id,
-        payload: formValues,
+        payload,
       });
       return;
     }
 
-    await createMutation.mutateAsync(formValues);
+    await createMutation.mutateAsync(payload);
   };
 
   const columns = useMemo<ColumnDef<Product>[]>(
@@ -185,6 +243,19 @@ export function ProductManagement() {
         ),
       },
       { header: "Category", accessorKey: "category" },
+      {
+        header: "Tax",
+        cell: ({ row }) => {
+          const taxType = row.original.taxType || "NON_VAT";
+          const label = TAX_OPTIONS.find((item) => item.value === taxType)?.label || "Non-VAT";
+
+          return (
+            <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${TAX_BADGE_CLASS[taxType]}`}>
+              {label}
+            </span>
+          );
+        },
+      },
       {
         header: "Actions",
         cell: ({ row }) => (
@@ -277,13 +348,13 @@ export function ProductManagement() {
           <tbody>
             {productsQuery.isLoading ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={9}>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={10}>
                   Loading products...
                 </td>
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={9}>
+                <td className="px-3 py-4 text-muted-foreground" colSpan={10}>
                   No products found.
                 </td>
               </tr>
@@ -433,10 +504,17 @@ export function ProductManagement() {
                   className="rounded-lg border bg-background px-3 py-2 text-sm"
                   value={formValues.category}
                   onChange={(event) =>
-                    setFormValues((state) => ({
-                      ...state,
-                      category: event.target.value as ProductCategory,
-                    }))
+                    setFormValues((state) => {
+                      const nextCategory = event.target.value as ProductCategory;
+                      const categoryDefaultTax = resolveCategoryTaxDefault(nextCategory);
+
+                      return {
+                        ...state,
+                        category: nextCategory,
+                        taxType: categoryDefaultTax.taxType,
+                        taxRate: categoryDefaultTax.taxRate,
+                      };
+                    })
                   }
                 >
                   {CATEGORY_OPTIONS.map((category) => (
@@ -469,6 +547,49 @@ export function ProductManagement() {
                   First uploaded image is used as primary thumbnail.
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  className="rounded-lg border bg-background px-3 py-2 text-sm"
+                  value={formValues.taxType || "NON_VAT"}
+                  onChange={(event) => {
+                    const nextTaxType = event.target.value as ProductTaxType;
+                    setFormValues((state) => ({
+                      ...state,
+                      taxType: nextTaxType,
+                      taxRate:
+                        nextTaxType === "VAT"
+                          ? Number(state.taxRate || storeTaxConfig?.defaultVatRate || 12)
+                          : 0,
+                    }));
+                  }}
+                >
+                  {TAX_OPTIONS.map((taxOption) => (
+                    <option key={taxOption.value} value={taxOption.value}>
+                      {taxOption.label}
+                    </option>
+                  ))}
+                </select>
+
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  placeholder="Tax rate %"
+                  disabled={(formValues.taxType || "NON_VAT") !== "VAT"}
+                  value={Number(formValues.taxRate || 0)}
+                  onChange={(event) =>
+                    setFormValues((state) => ({
+                      ...state,
+                      taxRate: Number(event.target.value || 0),
+                    }))
+                  }
+                />
+              </div>
+              <p className="text-xs text-slate-600">
+                Category defaults auto-apply tax on create. You can override anytime.
+              </p>
 
               <SukiGoImageUploader
                 value={formValues.images || []}

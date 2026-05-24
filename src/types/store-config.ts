@@ -49,6 +49,21 @@ export interface StoreConfigBusinessRules {
   maxLineItems: number;
 }
 
+export type BusinessTaxType = "VAT" | "NON_VAT";
+export type ProductTaxType = "VAT" | "VAT_EXEMPT" | "ZERO_RATED" | "NON_VAT";
+
+export interface StoreTaxCategoryDefault {
+  taxType: ProductTaxType;
+  taxRate: number;
+}
+
+export interface StoreTaxConfig {
+  enabled: boolean;
+  businessTaxType: BusinessTaxType;
+  defaultVatRate: number;
+  categoryDefaults?: Partial<Record<StoreCategoryKey, StoreTaxCategoryDefault>>;
+}
+
 export interface StorePrintingConfig {
   preferredAdapter?: "browser" | "bluetooth" | "airprint" | "local-bridge";
   paperSize?: "58mm" | "80mm";
@@ -73,6 +88,7 @@ export interface StoreTypeConfig {
   businessRules: StoreConfigBusinessRules;
   uiBehavior: StoreConfigUIBehavior;
   printing?: StorePrintingConfig;
+  tax?: StoreTaxConfig;
 }
 
 export interface StoreConfigResponse {

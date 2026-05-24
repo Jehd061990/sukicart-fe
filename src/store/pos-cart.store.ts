@@ -11,6 +11,9 @@ export interface POSCartItem {
   maxStock: number;
   variant: string;
   note: string;
+  taxType: "VAT" | "VAT_EXEMPT" | "ZERO_RATED" | "NON_VAT";
+  taxRate: number;
+  category: "vegetables" | "meat" | "fish";
 }
 
 interface POSCartState {
@@ -53,6 +56,9 @@ export const usePOSCartStore = create<POSCartState>((set, get) => ({
         lineKey,
         variant,
         note,
+        taxType: (item.taxType || "NON_VAT") as POSCartItem["taxType"],
+        taxRate: Number.isFinite(Number(item.taxRate)) ? Number(item.taxRate) : 0,
+        category: (item.category || "vegetables") as POSCartItem["category"],
       };
     });
 
@@ -103,6 +109,9 @@ export const usePOSCartStore = create<POSCartState>((set, get) => ({
             maxStock: product.stock,
             variant,
             note,
+            taxType: product.taxType || "NON_VAT",
+            taxRate: Number.isFinite(Number(product.taxRate)) ? Number(product.taxRate) : 0,
+            category: product.category,
           },
         ],
       };

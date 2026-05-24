@@ -26,8 +26,38 @@ export interface POSOrderResponse {
   order: {
     _id: string;
     total: number;
+    totalAmount?: number;
     status: string;
     type: "POS" | "ONLINE";
+    taxSummary?: {
+      businessTaxType: "VAT" | "NON_VAT";
+      taxEnabled: boolean;
+      defaultVatRate: number;
+      subtotal: number;
+      vatableSales: number;
+      vatAmount: number;
+      vatExemptSales: number;
+      zeroRatedSales: number;
+      nonVatSales: number;
+      totalTax: number;
+      grandTotal: number;
+    };
+  };
+}
+
+export interface POSTaxSummaryResponse {
+  summary: {
+    ordersCount: number;
+    vatableSales: number;
+    vatAmount: number;
+    vatExemptSales: number;
+    zeroRatedSales: number;
+    nonVatSales: number;
+    grandTotal: number;
+  };
+  range: {
+    from: string | null;
+    to: string | null;
   };
 }
 

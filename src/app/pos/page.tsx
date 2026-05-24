@@ -21,6 +21,7 @@ import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
 import { printerService } from "@/lib/pos-printing/printer-service";
 import { openReceiptPrintWindow } from "@/lib/pos-printing/receipt-template";
 import { ReceiptPayload, ThermalPrinterDevice } from "@/lib/pos-printing/types";
+import { computeTaxSummary } from "@/lib/tax/pos-tax";
 import { useAuthStore } from "@/store/auth.store";
 import { usePOSCartStore } from "@/store/pos-cart.store";
 import { usePOSPrintStore } from "@/store/pos-print.store";
@@ -171,6 +172,7 @@ export default function POSPage() {
   const configuredPrinterName = String(printingConfig.desktopPrinterName || "").trim() || undefined;
   const configuredBluetoothPrinter = printingConfig.bluetoothPrinter || null;
   const autoPrintEnabled = printingConfig.autoPrint !== false;
+  const taxConfig = storeConfig?.tax;
   const preferredPOSMode = storeConfigQuery.data?.store?.preferredPOSMode || "desktop";
   const runtimeProfile = usePOSDeviceProfile(preferredPOSMode);
   const isCompactLayout =
@@ -304,17 +306,59 @@ export default function POSPage() {
     [items],
   );
 
-  const subtotal = useMemo(
-    () => Number(items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)),
-    [items],
+  const rawTaxSummary = useMemo(
+    () =>
+      computeTaxSummary(
+        items.map((item) => ({
+          category: item.category,
+          lineTotal: item.price * item.quantity,
+          taxType: item.taxType,
+          taxRate: item.taxRate,
+        })),
+        taxConfig,
+      ),
+    [items, taxConfig],
   );
+
+  const subtotal = rawTaxSummary.subtotal;
 
   const effectiveDiscount = Math.min(discountAmount, subtotal);
 
-  const total = useMemo(
-    () => Number(Math.max(0, subtotal - effectiveDiscount).toFixed(2)),
-    [effectiveDiscount, subtotal],
-  );
+  const adjustedTaxSummary = useMemo(() => {
+    if (!subtotal) {
+      return {
+        ...rawTaxSummary,
+        subtotal: 0,
+        vatableSales: 0,
+        vatExemptSales: 0,
+        zeroRatedSales: 0,
+        nonVatSales: 0,
+        vatAmount: 0,
+        totalTax: 0,
+        grandTotal: 0,
+      };
+    }
+
+    const discountFactor = Math.max(0, Number(((subtotal - effectiveDiscount) / subtotal).toFixed(6)));
+    const applyFactor = (value: number) => Number((value * discountFactor).toFixed(2));
+    const discountedSubtotal = Number((subtotal - effectiveDiscount).toFixed(2));
+    const scaledVatable = applyFactor(rawTaxSummary.vatableSales);
+    const scaledVatAmount = rawTaxSummary.taxEnabled ? applyFactor(rawTaxSummary.vatAmount) : 0;
+
+    return {
+      ...rawTaxSummary,
+      subtotal: discountedSubtotal,
+      vatableSales: scaledVatable,
+      vatExemptSales: applyFactor(rawTaxSummary.vatExemptSales),
+      zeroRatedSales: applyFactor(rawTaxSummary.zeroRatedSales),
+      nonVatSales: applyFactor(rawTaxSummary.nonVatSales),
+      vatAmount: scaledVatAmount,
+      totalTax: scaledVatAmount,
+      grandTotal: Number((discountedSubtotal + scaledVatAmount).toFixed(2)),
+    };
+  }, [effectiveDiscount, rawTaxSummary, subtotal]);
+
+  const total = adjustedTaxSummary.grandTotal;
 
   const scannerStatusClassName =
     scannerStatusTone === "success"
@@ -450,11 +494,13 @@ export default function POSPage() {
         name: item.name,
         quantity: item.quantity,
         price: item.price,
+        taxType: item.taxType,
       })),
       subtotal,
       discount: effectiveDiscount,
       total,
-      vat: Number((total * 0.12).toFixed(2)),
+      vat: adjustedTaxSummary.vatAmount,
+      taxSummary: adjustedTaxSummary,
       paymentMethod: "Cash",
       qrCodeValue: `SukiGo:${orderId}`,
       footerText: "Thank you for shopping with SukiGo!",
@@ -1042,6 +1088,20 @@ export default function POSPage() {
               <span>Discount</span>
               <span>- PHP {effectiveDiscount.toFixed(2)}</span>
             </button>
+            <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
+              <div className="flex items-center justify-between">
+                <span>VATable Sales</span>
+                <span>PHP {adjustedTaxSummary.vatableSales.toFixed(2)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span>VAT Exempt Sales</span>
+                <span>PHP {adjustedTaxSummary.vatExemptSales.toFixed(2)}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span>VAT Amount</span>
+                <span>PHP {adjustedTaxSummary.vatAmount.toFixed(2)}</span>
+              </div>
+            </div>
             <div className="flex items-center justify-between text-lg font-bold text-slate-900">
               <span>Total</span>
               <span>PHP {total.toFixed(2)}</span>

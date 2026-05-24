@@ -29,6 +29,47 @@ const centerText = (value: string, width: number) => {
   return `${" ".repeat(left)}${value}`;
 };
 
+const wrapWords = (value: string, width: number) => {
+  const text = String(value || "").trim();
+  if (!text) {
+    return [""];
+  }
+
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length <= width) {
+      current = next;
+      continue;
+    }
+
+    if (current) {
+      lines.push(current);
+    }
+
+    if (word.length <= width) {
+      current = word;
+      continue;
+    }
+
+    let cursor = 0;
+    while (cursor < word.length) {
+      lines.push(word.slice(cursor, cursor + width));
+      cursor += width;
+    }
+    current = "";
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines;
+};
+
 const splitItemLine = (name: string, qty: number, amount: number, width: number) => {
   const right = `${qty}x ${money(amount)}`;
   const leftWidth = Math.max(8, width - right.length - 1);
@@ -165,7 +206,14 @@ export const buildEscPosReceipt = (payload: ReceiptPayload) => {
     .align("center")
     .bold(true)
     .size(1, 1)
-    .line(centerText(payload.sellerName, width))
+    .size(1, 1);
+
+  const sellerNameLines = wrapWords(payload.sellerName, width);
+  for (const textLine of sellerNameLines) {
+    builder.line(centerText(textLine, width));
+  }
+
+  builder
     .size(0, 0)
     .bold(false)
     .line(`Order ${payload.orderId}`)
@@ -187,6 +235,15 @@ export const buildEscPosReceipt = (payload: ReceiptPayload) => {
     .hr(width)
     .line(`Subtotal: ${money(payload.subtotal)}`)
     .line(`Discount: -${money(payload.discount)}`);
+
+  if (payload.taxSummary?.taxEnabled) {
+    builder
+      .line(`VATable Sales: ${money(payload.taxSummary.vatableSales)}`)
+      .line(`VAT Exempt: ${money(payload.taxSummary.vatExemptSales)}`)
+      .line(`Zero Rated: ${money(payload.taxSummary.zeroRatedSales)}`)
+      .line(`Non-VAT: ${money(payload.taxSummary.nonVatSales)}`)
+      .line(`VAT Amount: ${money(payload.taxSummary.vatAmount)}`);
+  }
 
   if (typeof payload.vat === "number") {
     builder.line(`VAT: ${money(payload.vat)}`);

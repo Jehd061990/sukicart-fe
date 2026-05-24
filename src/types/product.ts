@@ -1,6 +1,7 @@
 export type ProductCategory = "vegetables" | "meat" | "fish";
 export type ProductUnit = "kg" | "pcs";
 export type ProductStatus = "active" | "inactive";
+export type ProductTaxType = "VAT" | "VAT_EXEMPT" | "ZERO_RATED" | "NON_VAT";
 
 export interface ProductImageAsset {
   url: string;
@@ -27,6 +28,8 @@ export interface Product {
   image?: string;
   images?: ProductImageAsset[];
   description?: string;
+  taxType: ProductTaxType;
+  taxRate: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -62,6 +65,8 @@ export interface CreateProductPayload {
   status?: ProductStatus;
   image?: string;
   images?: ProductImageAsset[];
+  taxType?: ProductTaxType;
+  taxRate?: number;
 }
 
 export type UpdateProductPayload = Partial<CreateProductPayload>;

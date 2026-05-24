@@ -45,6 +45,21 @@ export interface ReceiptItem {
   name: string;
   quantity: number;
   price: number;
+  taxType?: "VAT" | "VAT_EXEMPT" | "ZERO_RATED" | "NON_VAT";
+}
+
+export interface ReceiptTaxSummary {
+  businessTaxType: "VAT" | "NON_VAT";
+  taxEnabled: boolean;
+  defaultVatRate: number;
+  subtotal: number;
+  vatableSales: number;
+  vatAmount: number;
+  vatExemptSales: number;
+  zeroRatedSales: number;
+  nonVatSales: number;
+  totalTax: number;
+  grandTotal: number;
 }
 
 export interface ReceiptPayload {
@@ -60,6 +75,7 @@ export interface ReceiptPayload {
   discount: number;
   total: number;
   vat?: number;
+  taxSummary?: ReceiptTaxSummary;
   paymentMethod?: string;
   footerText?: string;
   qrCodeValue?: string;

@@ -2,13 +2,30 @@ import { ReceiptPayload } from "@/lib/pos-printing/types";
 
 const line = (left: string, right: string) => `${left}<span>${right}</span>`;
 
+const TAX_TYPE_LABEL: Record<string, string> = {
+  VAT: "VAT 12%",
+  VAT_EXEMPT: "VAT Exempt",
+  ZERO_RATED: "Zero Rated",
+  NON_VAT: "Non-VAT",
+};
+
 export const buildReceiptHtml = (payload: ReceiptPayload) => {
   const rows = payload.items
     .map((item) => {
       const total = item.quantity * item.price;
-      return `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${total.toFixed(2)}</td></tr>`;
+      const taxLabel = TAX_TYPE_LABEL[String(item.taxType || "NON_VAT")] || "Non-VAT";
+      return `<tr><td>${item.name}<div class="tax-badge">${taxLabel}</div></td><td>${item.quantity}</td><td>${total.toFixed(2)}</td></tr>`;
     })
     .join("");
+
+  const taxRows = payload.taxSummary?.taxEnabled
+    ? `
+    <p class="line">${line("VATable Sales", payload.taxSummary.vatableSales.toFixed(2))}</p>
+    <p class="line">${line("VAT Exempt Sales", payload.taxSummary.vatExemptSales.toFixed(2))}</p>
+    <p class="line">${line("Zero Rated Sales", payload.taxSummary.zeroRatedSales.toFixed(2))}</p>
+    <p class="line">${line("Non-VAT Sales", payload.taxSummary.nonVatSales.toFixed(2))}</p>
+    <p class="line">${line("VAT Amount", payload.taxSummary.vatAmount.toFixed(2))}</p>`
+    : "";
 
   return `<!doctype html>
 <html>
@@ -22,6 +39,7 @@ export const buildReceiptHtml = (payload: ReceiptPayload) => {
   .muted { color: #475569; font-size: 12px; }
   .sep { border-top: 1px dashed #94a3b8; margin: 10px 0; }
   .line { display: flex; justify-content: space-between; font-size: 12px; }
+  .tax-badge { display: inline-block; margin-top: 2px; padding: 1px 5px; border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 10px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   td { padding: 3px 0; vertical-align: top; }
   td:nth-child(2), td:nth-child(3) { text-align: right; }
@@ -42,6 +60,7 @@ export const buildReceiptHtml = (payload: ReceiptPayload) => {
     <div class="sep"></div>
     <p class="line">${line("Subtotal", payload.subtotal.toFixed(2))}</p>
     <p class="line">${line("Discount", `-${payload.discount.toFixed(2)}`)}</p>
+    ${taxRows}
     <p class="line total">${line("Total", payload.total.toFixed(2))}</p>
   </div>
 </body>

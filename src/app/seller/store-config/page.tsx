@@ -11,9 +11,12 @@ import { printerService } from "@/lib/pos-printing/printer-service";
 import { ThermalPrinterDevice } from "@/lib/pos-printing/types";
 import { usePrinterManagerStore } from "@/store/printer-manager.store";
 import {
+  BusinessTaxType,
   CategoryThumbnailShape,
   PreferredPOSMode,
+  ProductTaxType,
   ScannerMode,
+  StoreTaxConfig,
   StorePrintingConfig,
   StoreCategoryImage,
   StoreCategoryKey,
@@ -26,6 +29,50 @@ const CATEGORY_DEFAULT_LABELS: Record<StoreCategoryKey, string> = {
   vegetables: "Vegetables",
   meat: "Meat",
   fish: "Fish",
+};
+
+const PRODUCT_TAX_OPTIONS: Array<{ value: ProductTaxType; label: string }> = [
+  { value: "VAT", label: "VAT 12%" },
+  { value: "VAT_EXEMPT", label: "VAT Exempt" },
+  { value: "ZERO_RATED", label: "Zero Rated" },
+  { value: "NON_VAT", label: "Non-VAT" },
+];
+
+const BUSINESS_TAX_OPTIONS: Array<{ value: BusinessTaxType; label: string }> = [
+  { value: "VAT", label: "VAT Registered" },
+  { value: "NON_VAT", label: "Non-VAT Registered" },
+];
+
+const normalizeCategoryTaxDefaults = (
+  input: StoreTaxConfig["categoryDefaults"] | undefined,
+  businessTaxType: BusinessTaxType,
+  defaultVatRate: number,
+) => {
+  return CATEGORY_KEYS.reduce(
+    (acc, key) => {
+      const fromConfig = input?.[key];
+
+      if (businessTaxType === "NON_VAT") {
+        acc[key] = {
+          taxType: "NON_VAT",
+          taxRate: 0,
+        };
+        return acc;
+      }
+
+      acc[key] = {
+        taxType: fromConfig?.taxType || "VAT",
+        taxRate:
+          fromConfig?.taxType === "VAT"
+            ? Number(fromConfig.taxRate || defaultVatRate)
+            : fromConfig?.taxType
+              ? 0
+              : defaultVatRate,
+      };
+      return acc;
+    },
+    {} as Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>,
+  );
 };
 
 const normalizeCategoryCatalog = (
@@ -169,6 +216,10 @@ export default function SellerStoreConfigPage() {
     bluetoothPrinterName: string;
     bluetoothPrinterMac: string;
     bluetoothAutoReconnect: boolean;
+    taxEnabled: boolean;
+    businessTaxType: BusinessTaxType;
+    defaultVatRate: number;
+    categoryTaxDefaults: Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>;
     categoryCatalog: Array<{
       key: StoreCategoryKey;
       label: string;
@@ -183,6 +234,12 @@ export default function SellerStoreConfigPage() {
   const [printerSectionsOpen, setPrinterSectionsOpen] = useState<PrinterSectionsState>(
     DEFAULT_PRINTER_SECTION_STATE,
   );
+  const [taxReportFrom, setTaxReportFrom] = useState("");
+  const [taxReportTo, setTaxReportTo] = useState("");
+  const [appliedTaxReportFrom, setAppliedTaxReportFrom] = useState("");
+  const [appliedTaxReportTo, setAppliedTaxReportTo] = useState("");
+  const [isExportingTaxCsv, setIsExportingTaxCsv] = useState(false);
+  const [isExportingTaxDetailCsv, setIsExportingTaxDetailCsv] = useState(false);
   const desktopPrinterInputRef = useRef<HTMLInputElement | null>(null);
   const checklistHydratedKeyRef = useRef<string | null>(null);
   const sectionsHydratedKeyRef = useRef<string | null>(null);
@@ -214,6 +271,14 @@ export default function SellerStoreConfigPage() {
 
     const config = storeConfigQuery.data.config;
     const printing = config.printing || {};
+    const tax = config.tax || {
+      enabled: true,
+      businessTaxType: "VAT",
+      defaultVatRate: 12,
+      categoryDefaults: {},
+    };
+    const businessTaxType = (tax.businessTaxType || "VAT") as BusinessTaxType;
+    const defaultVatRate = Number(tax.defaultVatRate || 12);
     const bluetoothPrinter = printing.bluetoothPrinter;
     return {
       storeType: storeConfigQuery.data.store.storeType,
@@ -238,6 +303,14 @@ export default function SellerStoreConfigPage() {
       bluetoothPrinterName: String(bluetoothPrinter?.printerName || ""),
       bluetoothPrinterMac: String(bluetoothPrinter?.printerMac || ""),
       bluetoothAutoReconnect: bluetoothPrinter?.autoReconnect !== false,
+      taxEnabled: tax.enabled !== false,
+      businessTaxType,
+      defaultVatRate,
+      categoryTaxDefaults: normalizeCategoryTaxDefaults(
+        tax.categoryDefaults,
+        businessTaxType,
+        defaultVatRate,
+      ),
       categoryCatalog: normalizeCategoryCatalog(config.uiBehavior.categoryCatalog),
     };
   }, [storeConfigQuery.data]);
@@ -434,6 +507,30 @@ export default function SellerStoreConfigPage() {
             maxLineItems: Number(form?.maxLineItems || 200),
             paymentMethods: ["cash"],
           },
+          tax: {
+            enabled:
+              form?.businessTaxType === "NON_VAT"
+                ? false
+                : Boolean(form?.taxEnabled),
+            businessTaxType: form?.businessTaxType || "VAT",
+            defaultVatRate: Number(form?.defaultVatRate || 12),
+            categoryDefaults: CATEGORY_KEYS.reduce((acc, key) => {
+              const entry = form?.categoryTaxDefaults[key];
+              acc[key] = {
+                taxType:
+                  form?.businessTaxType === "NON_VAT"
+                    ? "NON_VAT"
+                    : entry?.taxType || "VAT",
+                taxRate:
+                  form?.businessTaxType === "NON_VAT"
+                    ? 0
+                    : entry?.taxType === "VAT"
+                      ? Number(entry?.taxRate || form?.defaultVatRate || 12)
+                      : 0,
+              };
+              return acc;
+            }, {} as Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>),
+          },
           uiBehavior: {
             showPrescriptionInput: Boolean(form?.prescriptionRequired),
             showBarcodeScanner: Boolean(form?.barcodeScanning),
@@ -490,6 +587,84 @@ export default function SellerStoreConfigPage() {
 
     return storeConfigQuery.data.config.modules;
   }, [storeConfigQuery.data]);
+
+  const taxSummaryQuery = useQuery({
+    queryKey: ["pos-tax-summary", appliedTaxReportFrom, appliedTaxReportTo],
+    queryFn: () =>
+      posService.getTaxSummaryReport({
+        from: appliedTaxReportFrom || undefined,
+        to: appliedTaxReportTo || undefined,
+      }),
+  });
+
+  const applyTaxReportFilters = () => {
+    setAppliedTaxReportFrom(taxReportFrom);
+    setAppliedTaxReportTo(taxReportTo);
+  };
+
+  const exportTaxSummaryCsv = async () => {
+    setIsExportingTaxCsv(true);
+    try {
+      const blob = await posService.downloadTaxSummaryCsv({
+        from: appliedTaxReportFrom || undefined,
+        to: appliedTaxReportTo || undefined,
+      });
+
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `sukigo-tax-summary-${dateStamp}.csv`;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : "Failed to export tax CSV";
+      setStatusMessage(message);
+    } finally {
+      setIsExportingTaxCsv(false);
+    }
+  };
+
+  const exportTaxDetailedCsv = async () => {
+    setIsExportingTaxDetailCsv(true);
+    try {
+      const blob = await posService.downloadTaxDetailedCsv({
+        from: appliedTaxReportFrom || undefined,
+        to: appliedTaxReportTo || undefined,
+      });
+
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `sukigo-tax-detailed-${dateStamp}.csv`;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : "Failed to export detailed tax CSV";
+      setStatusMessage(message);
+    } finally {
+      setIsExportingTaxDetailCsv(false);
+    }
+  };
 
   if (storeConfigQuery.isLoading) {
     return <div className="rounded-xl border bg-card p-4">Loading store config...</div>;
@@ -1011,8 +1186,196 @@ export default function SellerStoreConfigPage() {
               />
             </label>
           </div>
+
         </article>
       </div>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Tax Configuration</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Configure VAT behavior once. POS checkout auto-computes mixed VAT and exempt items.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium">Business Tax Type</label>
+            <select
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={form.businessTaxType}
+              onChange={(event) => {
+                const nextBusinessTaxType = event.target.value as BusinessTaxType;
+                updateDraft({
+                  businessTaxType: nextBusinessTaxType,
+                  taxEnabled: nextBusinessTaxType === "NON_VAT" ? false : form.taxEnabled,
+                  categoryTaxDefaults: normalizeCategoryTaxDefaults(
+                    form.categoryTaxDefaults,
+                    nextBusinessTaxType,
+                    form.defaultVatRate,
+                  ),
+                });
+              }}
+            >
+              {BUSINESS_TAX_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">Default VAT Rate (%)</label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              disabled={form.businessTaxType === "NON_VAT"}
+              value={String(form.defaultVatRate)}
+              onChange={(event) => {
+                const nextRate = Number(event.target.value || 12);
+                updateDraft({ defaultVatRate: nextRate });
+              }}
+            />
+          </div>
+        </div>
+
+        <label className="mt-3 flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+          <span>Tax Enabled</span>
+          <input
+            type="checkbox"
+            checked={form.businessTaxType === "NON_VAT" ? false : form.taxEnabled}
+            disabled={form.businessTaxType === "NON_VAT"}
+            onChange={(event) => updateDraft({ taxEnabled: event.target.checked })}
+          />
+        </label>
+
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category Default Tax</p>
+          {CATEGORY_KEYS.map((key) => {
+            const defaultEntry = form.categoryTaxDefaults[key];
+            return (
+              <div key={key} className="grid gap-2 rounded-md border p-2 md:grid-cols-[1fr_180px_120px]">
+                <div className="text-sm font-medium capitalize text-slate-700">{key}</div>
+                <select
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                  value={defaultEntry.taxType}
+                  disabled={form.businessTaxType === "NON_VAT"}
+                  onChange={(event) => {
+                    const nextTaxType = event.target.value as ProductTaxType;
+                    updateDraft({
+                      categoryTaxDefaults: {
+                        ...form.categoryTaxDefaults,
+                        [key]: {
+                          taxType: nextTaxType,
+                          taxRate: nextTaxType === "VAT" ? Number(defaultEntry.taxRate || form.defaultVatRate) : 0,
+                        },
+                      },
+                    });
+                  }}
+                >
+                  {PRODUCT_TAX_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  disabled={form.businessTaxType === "NON_VAT" || defaultEntry.taxType !== "VAT"}
+                  value={String(defaultEntry.taxRate)}
+                  onChange={(event) =>
+                    updateDraft({
+                      categoryTaxDefaults: {
+                        ...form.categoryTaxDefaults,
+                        [key]: {
+                          ...defaultEntry,
+                          taxRate: Number(event.target.value || 0),
+                        },
+                      },
+                    })
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="mt-2 text-xs text-slate-600">
+          Non-VAT businesses force all products to Non-VAT and disable VAT computation.
+        </p>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Tax Reports</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          VAT Sales Report, VAT Exempt Report, Zero Rated Report, and Tax Summary.
+        </p>
+
+        <div className="mb-3 grid gap-2 md:grid-cols-[1fr_1fr_auto_auto_auto]">
+          <Input
+            type="date"
+            value={taxReportFrom}
+            onChange={(event) => setTaxReportFrom(event.target.value)}
+          />
+          <Input
+            type="date"
+            value={taxReportTo}
+            onChange={(event) => setTaxReportTo(event.target.value)}
+          />
+          <Button type="button" variant="outline" onClick={applyTaxReportFilters}>
+            Apply Filter
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isExportingTaxCsv}
+            onClick={() => void exportTaxSummaryCsv()}
+          >
+            {isExportingTaxCsv ? "Exporting..." : "Export CSV"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isExportingTaxDetailCsv}
+            onClick={() => void exportTaxDetailedCsv()}
+          >
+            {isExportingTaxDetailCsv ? "Exporting..." : "Export Detailed CSV"}
+          </Button>
+        </div>
+
+        <p className="mb-3 text-xs text-slate-500">
+          Active range: {appliedTaxReportFrom || "Any"} to {appliedTaxReportTo || "Any"}
+        </p>
+
+        {taxSummaryQuery.isLoading ? (
+          <p className="text-sm text-slate-500">Loading tax reports...</p>
+        ) : taxSummaryQuery.isError ? (
+          <p className="text-sm text-rose-600">Failed to load tax report summary.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">VAT Sales Report</p>
+              <p className="font-semibold text-slate-900">PHP {Number(taxSummaryQuery.data?.summary.vatableSales || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">VAT Exempt Sales Report</p>
+              <p className="font-semibold text-slate-900">PHP {Number(taxSummaryQuery.data?.summary.vatExemptSales || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">Zero Rated Report</p>
+              <p className="font-semibold text-slate-900">PHP {Number(taxSummaryQuery.data?.summary.zeroRatedSales || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">Tax Summary</p>
+              <p className="font-semibold text-slate-900">VAT PHP {Number(taxSummaryQuery.data?.summary.vatAmount || 0).toFixed(2)}</p>
+            </div>
+          </div>
+        )}
+      </article>
 
       <article className="rounded-xl border bg-card p-4 shadow-sm">
         <h2 className="text-lg font-semibold">Enabled Modules</h2>

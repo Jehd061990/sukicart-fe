@@ -8,6 +8,7 @@ import {
   CreatePOSResponse,
   POSListResponse,
   POSOrderResponse,
+  POSTaxSummaryResponse,
   SessionListResponse,
   UpdatePOSPayload,
   UpgradePOSSlotsPayload,
@@ -25,6 +26,64 @@ export const posService = {
       payload,
     );
     return data;
+  },
+
+  getTaxSummaryReport: async (filters?: { from?: string; to?: string }) => {
+    const params = new URLSearchParams();
+
+    if (filters?.from) {
+      params.set("from", filters.from);
+    }
+
+    if (filters?.to) {
+      params.set("to", filters.to);
+    }
+
+    const query = params.toString();
+    const { data } = await apiClient.get<POSTaxSummaryResponse>(
+      `/pos/reports/tax-summary${query ? `?${query}` : ""}`,
+    );
+    return data;
+  },
+
+  downloadTaxSummaryCsv: async (filters?: { from?: string; to?: string }) => {
+    const params = new URLSearchParams();
+
+    if (filters?.from) {
+      params.set("from", filters.from);
+    }
+
+    if (filters?.to) {
+      params.set("to", filters.to);
+    }
+
+    const query = params.toString();
+    const response = await apiClient.get(
+      `/pos/reports/tax-summary.csv${query ? `?${query}` : ""}`,
+      { responseType: "blob" },
+    );
+
+    return response.data as Blob;
+  },
+
+  downloadTaxDetailedCsv: async (filters?: { from?: string; to?: string }) => {
+    const params = new URLSearchParams();
+
+    if (filters?.from) {
+      params.set("from", filters.from);
+    }
+
+    if (filters?.to) {
+      params.set("to", filters.to);
+    }
+
+    const query = params.toString();
+    const response = await apiClient.get(
+      `/pos/reports/tax-detailed.csv${query ? `?${query}` : ""}`,
+      { responseType: "blob" },
+    );
+
+    return response.data as Blob;
   },
 
   decodeBarcodeFrame: async (payload: DecodeBarcodeFramePayload) => {
