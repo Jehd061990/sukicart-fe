@@ -200,7 +200,7 @@ export const SELLER_MODULE_CATALOG: SellerDashboardModule[] = [
   {
     key: "billing",
     label: "Billing",
-    href: "/seller/pos",
+    href: "/seller/billing",
     icon: DollarSign,
     description: "Subscription lifecycle, invoices, and upgrades.",
     requiredFeature: "billing",
@@ -534,7 +534,7 @@ export const SELLER_QUICK_ACTIONS = [
     id: "qa-3",
     label: "Review Billing",
     icon: DollarSign,
-    href: "/seller/pos",
+    href: "/seller/billing",
   },
   {
     id: "qa-4",

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AccessControlOverridesPanel } from "@/components/seller/access-control-overrides-panel";
+import { PlanFeatureFlagsPanel } from "@/components/seller/plan-feature-flags-panel";
 import { ImageUploadDropzone } from "@/components/uploads/ImageUploadDropzone";
 import { posService } from "@/lib/api/services/pos.service";
 import { usePOSDeviceProfile } from "@/hooks/pos/use-device-profile";
@@ -95,12 +97,42 @@ const normalizeCategoryCatalog = (
     };
   });
 
+type StoreConfigDraft = {
+  storeType: StoreType;
+  preferredPOSMode: PreferredPOSMode;
+  barcodeScanning: boolean;
+  expiryTracking: boolean;
+  prescriptionRequired: boolean;
+  bulkQuantityInput: boolean;
+  maxLineItems: number;
+  scannerModes: ScannerMode[];
+  defaultScannerMode: ScannerMode;
+  categoryThumbnailShape: CategoryThumbnailShape;
+  printerAdapter: NonNullable<StorePrintingConfig["preferredAdapter"]>;
+  receiptPaperSize: NonNullable<StorePrintingConfig["paperSize"]>;
+  autoPrintReceipts: boolean;
+  desktopPrinterName: string;
+  bluetoothPrinterName: string;
+  bluetoothPrinterMac: string;
+  bluetoothAutoReconnect: boolean;
+  taxEnabled: boolean;
+  businessTaxType: BusinessTaxType;
+  defaultVatRate: number;
+  categoryTaxDefaults: Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>;
+  categoryCatalog: Array<{
+    key: StoreCategoryKey;
+    label: string;
+    image: string;
+    images: StoreCategoryImage[];
+  }>;
+};
+
 const ensureValidScannerMode = (
   selectedModes: ScannerMode[],
   defaultMode: ScannerMode,
-) => {
-  const deduped = Array.from(new Set(selectedModes));
-  const safeModes = deduped.length > 0 ? deduped : ["manual"];
+): { modes: ScannerMode[]; defaultMode: ScannerMode } => {
+  const deduped = Array.from(new Set(selectedModes)) as ScannerMode[];
+  const safeModes: ScannerMode[] = deduped.length > 0 ? deduped : ["manual"];
 
   if (safeModes.includes(defaultMode)) {
     return {
@@ -198,35 +230,7 @@ const getRuntimeDisableReason = (
 };
 
 export default function SellerStoreConfigPage() {
-  const [draft, setDraft] = useState<{
-    storeType: StoreType;
-    preferredPOSMode: PreferredPOSMode;
-    barcodeScanning: boolean;
-    expiryTracking: boolean;
-    prescriptionRequired: boolean;
-    bulkQuantityInput: boolean;
-    maxLineItems: number;
-    scannerModes: ScannerMode[];
-    defaultScannerMode: ScannerMode;
-    categoryThumbnailShape: CategoryThumbnailShape;
-    printerAdapter: NonNullable<StorePrintingConfig["preferredAdapter"]>;
-    receiptPaperSize: NonNullable<StorePrintingConfig["paperSize"]>;
-    autoPrintReceipts: boolean;
-    desktopPrinterName: string;
-    bluetoothPrinterName: string;
-    bluetoothPrinterMac: string;
-    bluetoothAutoReconnect: boolean;
-    taxEnabled: boolean;
-    businessTaxType: BusinessTaxType;
-    defaultVatRate: number;
-    categoryTaxDefaults: Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>;
-    categoryCatalog: Array<{
-      key: StoreCategoryKey;
-      label: string;
-      image: string;
-      images: StoreCategoryImage[];
-    }>;
-  } | null>(null);
+  const [draft, setDraft] = useState<StoreConfigDraft | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [printerActionMessage, setPrinterActionMessage] = useState<string | null>(null);
   const [bridgeConnectSuccess, setBridgeConnectSuccess] = useState<boolean | null>(null);
@@ -264,7 +268,7 @@ export default function SellerStoreConfigPage() {
     queryFn: () => posService.getStoreConfig(),
   });
 
-  const baseForm = useMemo(() => {
+  const baseForm = useMemo<StoreConfigDraft | null>(() => {
     if (!storeConfigQuery.data) {
       return null;
     }
@@ -288,10 +292,26 @@ export default function SellerStoreConfigPage() {
       prescriptionRequired: Boolean(config.features.prescriptionRequired),
       bulkQuantityInput: Boolean(config.features.bulkQuantityInput),
       maxLineItems: Number(config.businessRules.maxLineItems || 200),
-      scannerModes: Array.isArray(config.uiBehavior.scannerModes)
-        ? config.uiBehavior.scannerModes
-        : ["manual"],
-      defaultScannerMode: config.uiBehavior.defaultScannerMode || "manual",
+      scannerModes: ensureValidScannerMode(
+        (Array.isArray(config.uiBehavior.scannerModes)
+          ? config.uiBehavior.scannerModes.filter((mode): mode is ScannerMode =>
+              SCANNER_MODES.includes(mode as ScannerMode),
+            )
+          : ["manual"]) as ScannerMode[],
+        SCANNER_MODES.includes(config.uiBehavior.defaultScannerMode as ScannerMode)
+          ? (config.uiBehavior.defaultScannerMode as ScannerMode)
+          : "manual",
+      ).modes,
+      defaultScannerMode: ensureValidScannerMode(
+        (Array.isArray(config.uiBehavior.scannerModes)
+          ? config.uiBehavior.scannerModes.filter((mode): mode is ScannerMode =>
+              SCANNER_MODES.includes(mode as ScannerMode),
+            )
+          : ["manual"]) as ScannerMode[],
+        SCANNER_MODES.includes(config.uiBehavior.defaultScannerMode as ScannerMode)
+          ? (config.uiBehavior.defaultScannerMode as ScannerMode)
+          : "manual",
+      ).defaultMode,
       categoryThumbnailShape:
         config.uiBehavior.categoryThumbnailShape === "circle"
           ? "circle"
@@ -682,7 +702,7 @@ export default function SellerStoreConfigPage() {
     return null;
   }
 
-  const updateDraft = (next: Partial<typeof form>) => {
+  const updateDraft = (next: Partial<StoreConfigDraft>) => {
     setDraft({
       ...form,
       ...next,
@@ -921,31 +941,27 @@ export default function SellerStoreConfigPage() {
       selectedPrinter: selectedPrinter || undefined,
   });
 
-  const adapterDiagnostics = useMemo(
-    () =>
-      PRINTER_ADAPTER_OPTIONS.map((option) => {
-        const runtimeReason = getRuntimeDisableReason(option.value, runtimeProfile);
-        const runtimeAllowed = !runtimeReason;
+  const adapterDiagnostics = PRINTER_ADAPTER_OPTIONS.map((option) => {
+    const runtimeReason = getRuntimeDisableReason(option.value, runtimeProfile);
+    const runtimeAllowed = !runtimeReason;
 
-        const health = printerService.getBridgeHealth({
-          runtimeProfile,
-          preferredAdapter: option.value,
-          preferBluetooth: option.value === "bluetooth",
-          printerName: form.desktopPrinterName.trim() || undefined,
-        });
+    const health = printerService.getBridgeHealth({
+      runtimeProfile,
+      preferredAdapter: option.value,
+      preferBluetooth: option.value === "bluetooth",
+      printerName: form.desktopPrinterName.trim() || undefined,
+    });
 
-        const available = runtimeAllowed && health.available;
-        const reason = !runtimeAllowed ? runtimeReason : !health.available ? health.message : "Ready";
+    const available = runtimeAllowed && health.available;
+    const reason = !runtimeAllowed ? runtimeReason : !health.available ? health.message : "Ready";
 
-        return {
-          ...option,
-          runtimeAllowed,
-          available,
-          reason,
-        };
-      }),
-    [form.desktopPrinterName, runtimeProfile],
-  );
+    return {
+      ...option,
+      runtimeAllowed,
+      available,
+      reason,
+    };
+  });
 
   const setupChecklist =
     form.printerAdapter === "local-bridge"
@@ -1800,6 +1816,10 @@ export default function SellerStoreConfigPage() {
           ))}
         </div>
       </article>
+
+      <PlanFeatureFlagsPanel />
+
+      <AccessControlOverridesPanel />
 
       <Button
         onClick={() => updateMutation.mutate()}

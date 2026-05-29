@@ -13,9 +13,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const [mobileSidebarPath, setMobileSidebarPath] = useState<string | null>(null);
   const isMobileSidebarOpen = mobileSidebarPath === pathname;
   const isPOSRoute = pathname.startsWith("/pos");
-  const isPOSLikeRoute = pathname.startsWith("/pos") || pathname.startsWith("/seller/pos");
-  const hideTopHeader =
-    pathname.startsWith("/pos") || pathname.startsWith("/seller/pos");
+  const hideTopHeader = pathname.startsWith("/pos");
   const isMarketingRoute =
     pathname === "/" ||
     pathname.startsWith("/register") ||
@@ -32,7 +30,7 @@ export function AppShell({ children }: PropsWithChildren) {
       <AppSidebar
         mobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setMobileSidebarPath(null)}
-        forceDesktopCollapsed={isPOSLikeRoute}
+        forceDesktopCollapsed={false}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!hideTopHeader ? (

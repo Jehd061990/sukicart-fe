@@ -3,6 +3,7 @@ import {
   Bluetooth,
   ChartColumnIncreasing,
   ShieldCheck,
+  DollarSign,
   LucideIcon,
   ClipboardCheck,
   FileClock,
@@ -56,6 +57,7 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
       { label: "Dashboard", href: "/seller/dashboard", icon: LayoutGrid },
       { label: "Multi-Branch", href: "/seller/branches", icon: Building2 },
       { label: "POS", href: "/seller/pos", icon: HandCoins },
+      { label: "Billing", href: "/seller/billing", icon: DollarSign },
       {
         label: "Products",
         href: "/seller/products",

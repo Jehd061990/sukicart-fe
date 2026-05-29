@@ -37,6 +37,18 @@ export const buildPOSRuntimeProfile = (
   preferredMode: PreferredPOSMode,
 ): POSRuntimeProfile => {
   const runtimeMode = resolveRuntimeMode(detection, preferredMode);
+  const layoutDensity =
+    runtimeMode === "desktop" ? "spacious" : runtimeMode === "tablet" ? "comfortable" : "compact";
+  const cartPlacement = runtimeMode === "desktop" || runtimeMode === "tablet" ? "right-rail" : "bottom-sheet";
+  const productColumns =
+    runtimeMode === "desktop"
+      ? { compact: 2, regular: 3, expanded: 4 }
+      : runtimeMode === "tablet"
+        ? { compact: 2, regular: 3, expanded: 3 }
+        : { compact: 2, regular: 2, expanded: 2 };
+  const capabilityLevel =
+    runtimeMode === "desktop" ? "high" : runtimeMode === "tablet" ? "medium" : "low";
+  const printerLikelyWireless = runtimeMode === "android" || runtimeMode === "ios" || runtimeMode === "mobile";
 
   return {
     preferredMode,
@@ -48,5 +60,10 @@ export const buildPOSRuntimeProfile = (
     isMobile: detection.isMobile,
     isPWA: detection.isPWA,
     inputMethod: detection.inputMethod,
+    layoutDensity,
+    cartPlacement,
+    productColumns,
+    printerLikelyWireless,
+    capabilityLevel,
   };
 };

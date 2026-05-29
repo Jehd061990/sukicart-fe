@@ -33,34 +33,55 @@ const ADAPTER_BY_TYPE: Record<PrinterAdapterType, PrinterAdapter> = {
   browser: BrowserPrintAdapter,
 };
 
-const chooseAdapter = (context: PrintContext) => {
+const resolveAdapterPipeline = (context: PrintContext) => {
+  const requested: PrinterAdapter[] = [];
+
   if (context.preferredAdapter) {
     const preferred = ADAPTER_BY_TYPE[context.preferredAdapter];
-    if (preferred && preferred.isSupported(context)) {
-      return preferred;
+    if (preferred) {
+      requested.push(preferred);
     }
   }
 
   if (context.runtimeProfile.isAndroid && context.preferBluetooth) {
-    return BluetoothPrintAdapter;
+    requested.push(BluetoothPrintAdapter);
   }
 
   if (context.runtimeProfile.isIOS) {
-    return AirPrintAdapter;
+    requested.push(AirPrintAdapter);
   }
 
   if (context.runtimeProfile.isDesktop) {
-    if (FutureLocalBridgeAdapter.isSupported(context)) {
-      return FutureLocalBridgeAdapter;
-    }
-
-    return BrowserPrintAdapter;
+    requested.push(FutureLocalBridgeAdapter);
+    requested.push(BrowserPrintAdapter);
   }
 
-  return ADAPTERS.find((adapter) => adapter.isSupported(context)) || BrowserPrintAdapter;
+  requested.push(...ADAPTERS);
+
+  const deduped = requested.filter(
+    (adapter, index, arr) => arr.findIndex((entry) => entry.type === adapter.type) === index,
+  );
+
+  const supported = deduped.filter((adapter) => adapter.isSupported(context));
+  const primary = supported[0] || BrowserPrintAdapter;
+  const fallback = supported.slice(1);
+
+  return {
+    primary,
+    fallback,
+  };
+};
+
+const chooseAdapter = (context: PrintContext) => {
+  return resolveAdapterPipeline(context).primary;
 };
 
 export const printerService = {
+  getAdapterPipeline(context: PrintContext): Array<PrinterAdapterType> {
+    const pipeline = resolveAdapterPipeline(context);
+    return [pipeline.primary.type, ...pipeline.fallback.map((adapter) => adapter.type)];
+  },
+
   getPreferredAdapter(
     profile: POSRuntimeProfile,
     preferBluetooth = true,
