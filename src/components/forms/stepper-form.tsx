@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -25,7 +26,6 @@ const STEP_TITLES = [
   "Personal Info",
   "Store Details",
   "Business Verification",
-  "Delivery Option",
   "Agreement",
 ] as const;
 
@@ -33,14 +33,15 @@ const STEP_FIELD_NAMES: Array<Array<keyof SellerRegistrationFormValues>> = [
   ["fullName", "phoneNumber", "email", "password"],
   ["storeName", "storeType", "preferredPOSMode", "marketLocation", "exactAddress"],
   ["dtiPermit", "validId"],
-  ["handleOwnDelivery", "usePlatformRiders"],
   ["acceptTerms"],
 ];
 
 export function StepperForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const hasAutoSubmittedFromTerms = useRef(false);
 
   const draft = useSellerRegistrationStore((state) => state.draft);
   const setDraft = useSellerRegistrationStore((state) => state.setDraft);
@@ -96,6 +97,34 @@ export function StepperForm() {
       validIdName: values.validId?.name || "",
     });
   }, [setDraft, values]);
+
+  useEffect(() => {
+    setValue("handleOwnDelivery", false, { shouldDirty: false, shouldValidate: false });
+    setValue("usePlatformRiders", true, { shouldDirty: false, shouldValidate: false });
+  }, [setValue]);
+
+  useEffect(() => {
+    const stepParam = Number(searchParams.get("step"));
+    const acceptTermsParam = searchParams.get("acceptTerms");
+    const autoSubmitParam = searchParams.get("autoSubmit");
+
+    if (Number.isInteger(stepParam) && stepParam >= 0 && stepParam < STEP_TITLES.length) {
+      setStep(stepParam);
+    }
+
+    if (acceptTermsParam === "1") {
+      setValue("acceptTerms", true, { shouldDirty: true, shouldValidate: true });
+    }
+
+    if (
+      acceptTermsParam === "1" &&
+      autoSubmitParam === "1" &&
+      !hasAutoSubmittedFromTerms.current
+    ) {
+      hasAutoSubmittedFromTerms.current = true;
+      void handleSubmit(onSubmit)();
+    }
+  }, [handleSubmit, searchParams, setValue]);
 
   const progress = useMemo(
     () => Math.round(((step + 1) / STEP_TITLES.length) * 100),
@@ -286,25 +315,21 @@ export function StepperForm() {
       ) : null}
 
       {step === 3 ? (
-        <div className="space-y-3">
-          <CheckboxField
-            label="I handle my own delivery"
-            name="handleOwnDelivery"
-            register={register}
-            error={errors.handleOwnDelivery}
-          />
-          <CheckboxField
-            label="Use platform riders"
-            name="usePlatformRiders"
-            register={register}
-          />
-        </div>
-      ) : null}
-
-      {step === 4 ? (
         <div className="space-y-4">
           <CheckboxField
-            label="Accept Terms & Conditions"
+            label={
+              <>
+                Accept{" "}
+                <Link
+                  href="/register/seller/terms"
+                  className="font-semibold text-orange-700 underline underline-offset-2"
+                  onClick={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => event.stopPropagation()}
+                >
+                  Terms &amp; Conditions
+                </Link>
+              </>
+            }
             name="acceptTerms"
             register={register}
             error={errors.acceptTerms}
