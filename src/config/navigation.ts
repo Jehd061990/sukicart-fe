@@ -71,7 +71,11 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
         icon: Warehouse,
       },
       { label: "Transfers", href: "/seller/transfers", icon: Repeat2 },
-      { label: "Analytics", href: "/seller/analytics", icon: ChartColumnIncreasing },
+      {
+        label: "Analytics",
+        href: "/seller/analytics",
+        icon: ChartColumnIncreasing,
+      },
       { label: "Reports", href: "/seller/reports", icon: ClipboardCheck },
       { label: "Automation", href: "/seller/automation", icon: Sparkles },
       { label: "Audit Logs", href: "/seller/audit-logs", icon: FileClock },
@@ -138,9 +142,13 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     role: "POS",
     routeBase: "/pos",
     modules: [
-      { label: "Sales Dashboard", href: "/pos?panel=dashboard", icon: ChartColumnIncreasing },
+      {
+        label: "Sales Dashboard",
+        href: "/pos?panel=dashboard",
+        icon: ChartColumnIncreasing,
+      },
       { label: "Store Operations", href: "/pos", icon: HandCoins },
-      { label: "Online Orders", href: "/pos?panel=orders", icon: ShoppingCart },
+      // { label: "Online Orders", href: "/pos?panel=orders", icon: ShoppingCart },  {/* This will be a future feature if there are many users of POS */}
       { label: "Receipt History", href: "/pos?panel=receipts", icon: Receipt },
       { label: "Printer Module", href: "/pos/printer", icon: Bluetooth },
     ],

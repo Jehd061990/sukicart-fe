@@ -115,6 +115,7 @@ const barcodeVariants = (value: string) => {
 };
 
 const POS_QUEUE_DISMISS_STORAGE_KEY = "sukigo:pos-queue-dismissed-attempts";
+const POS_SCANNER_VISIBILITY_STORAGE_KEY = "sukigo:pos-show-scanner";
 
 export default function POSPage() {
   const searchParams = useSearchParams();
@@ -514,6 +515,33 @@ export default function POSPage() {
   useEffect(() => {
     void hydrateReceiptHistory();
   }, [hydrateReceiptHistory]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const saved = window.localStorage.getItem(POS_SCANNER_VISIBILITY_STORAGE_KEY);
+    if (saved === "0") {
+      setShowScannerPanel(false);
+      return;
+    }
+
+    if (saved === "1") {
+      setShowScannerPanel(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      POS_SCANNER_VISIBILITY_STORAGE_KEY,
+      showScannerPanel ? "1" : "0",
+    );
+  }, [showScannerPanel]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1011,7 +1039,8 @@ export default function POSPage() {
       ) : null}
 
       <div className="px-3 pt-3">
-        <div className="mb-3 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        {/* This will be a future feature if there are many users of POS */}
+        {/* <div className="mb-3 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           <button
             type="button"
             onClick={() => setActivePOSPanel("sales")}
@@ -1034,7 +1063,7 @@ export default function POSPage() {
           >
             Online Orders
           </button>
-        </div>
+        </div> */}
 
         {showOnboarding ? (
           <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 shadow-sm">
