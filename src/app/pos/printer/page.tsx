@@ -298,7 +298,7 @@ export default function POSPrinterModulePage() {
               href="/pos"
               className="rounded-md bg-slate-800 px-3 py-1 text-[11px] font-semibold text-white"
             >
-              Back to Order Dashboard
+              Back to Store Operations
             </Link>
           </div>
 

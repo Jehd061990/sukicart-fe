@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { BarcodeScannerPanel, ScannerStatusTone } from "@/components/pos/barcode-scanner-panel";
@@ -9,8 +10,10 @@ import { CartBar } from "@/components/pos/CartBar";
 import { CartItem } from "@/components/pos/CartItem";
 import { CheckoutModal } from "@/components/pos/CheckoutModal";
 import { DiscountModal } from "@/components/pos/DiscountModal";
+import { OnlineOrdersPanel } from "@/components/pos/online-orders-panel";
 import { PrintQueuePanel } from "@/components/pos/print-queue-panel";
 import { ProductCard } from "@/components/pos/ProductCard";
+import { SalesPerformancePanel } from "@/components/pos/sales-performance-panel";
 import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { Input } from "@/components/ui/input";
 import { normalizeProductImageUrl } from "@/lib/images/product-image";
@@ -111,6 +114,7 @@ const barcodeVariants = (value: string) => {
 };
 
 export default function POSPage() {
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [category, setCategory] = useState("all");
@@ -128,6 +132,7 @@ export default function POSPage() {
   const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
   const [showScannerPanel, setShowScannerPanel] = useState(true);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const [activePOSPanel, setActivePOSPanel] = useState<"sales" | "orders" | "dashboard">("sales");
   const [printActionMessage, setPrintActionMessage] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -708,6 +713,21 @@ export default function POSPage() {
     retryLatestFailedReceipt,
   });
 
+  useEffect(() => {
+    const panel = searchParams.get("panel");
+    if (panel === "orders") {
+      setActivePOSPanel("orders");
+      return;
+    }
+
+    if (panel === "dashboard") {
+      setActivePOSPanel("dashboard");
+      return;
+    }
+
+    setActivePOSPanel("sales");
+  }, [searchParams]);
+
   const reconnectPrinter = async () => {
     const adapter = printerService.getPreferredAdapter(
       runtimeProfile,
@@ -779,6 +799,31 @@ export default function POSPage() {
       ) : null}
 
       <div className="px-3 pt-3">
+        <div className="mb-3 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActivePOSPanel("sales")}
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+              activePOSPanel === "sales"
+                ? "bg-brand-600 text-white"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Walk-In Sales
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePOSPanel("orders")}
+            className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+              activePOSPanel === "orders"
+                ? "bg-brand-600 text-white"
+                : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Online Orders
+          </button>
+        </div>
+
         {showOnboarding ? (
           <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -873,23 +918,25 @@ export default function POSPage() {
         )} */}
       </div>
 
-      <PrintQueuePanel
-        receipts={failedReceipts}
-        onRetry={(receiptId) => {
-          void retryFailedReceipt(receiptId);
-        }}
-        onRetryAll={() => {
-          void retryAllFailedReceipts();
-        }}
-        onReconnect={() => {
-          void reconnectPrinter();
-        }}
-        onSavePdf={saveReceiptAsPdf}
-      />
+      {activePOSPanel === "sales" ? (
+        <>
+          <PrintQueuePanel
+            receipts={failedReceipts}
+            onRetry={(receiptId) => {
+              void retryFailedReceipt(receiptId);
+            }}
+            onRetryAll={() => {
+              void retryAllFailedReceipts();
+            }}
+            onReconnect={() => {
+              void reconnectPrinter();
+            }}
+            onSavePdf={saveReceiptAsPdf}
+          />
 
-      <div
-        className={`grid h-full gap-4 p-3 ${desktopGridClass}`}
-      >
+          <div
+            className={`grid h-full gap-4 p-3 ${desktopGridClass}`}
+          >
         {isDesktopLayout ? (
           <aside
             className={`hidden rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 xl:block ${
@@ -929,6 +976,16 @@ export default function POSPage() {
                 }`}
               >
                 {desktopSidebarCollapsed ? "Checkout" : "Checkout (F9)"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePOSPanel("orders")}
+                title="Online Orders"
+                className={`w-full rounded-lg bg-indigo-600 px-3 py-2 text-left font-medium text-white ${
+                  desktopSidebarCollapsed ? "text-center" : ""
+                }`}
+              >
+                {desktopSidebarCollapsed ? "Orders" : "Online Orders"}
               </button>
               <Link
                 href="/scanner"
@@ -1215,15 +1272,23 @@ export default function POSPage() {
             </button>
           </div>
         </aside>
-      </div>
+          </div>
 
-      {isCompactLayout ? (
-        <CartBar
-          itemCount={itemCount}
-          total={total}
-          onOpenCart={() => setCheckoutOpen(true)}
-        />
-      ) : null}
+          {isCompactLayout ? (
+            <CartBar
+              itemCount={itemCount}
+              total={total}
+              onOpenCart={() => setCheckoutOpen(true)}
+            />
+          ) : null}
+        </>
+      ) : activePOSPanel === "orders" ? (
+        <div className="px-3 pb-3">
+          <OnlineOrdersPanel />
+        </div>
+      ) : (
+        <SalesPerformancePanel />
+      )}
 
       {/* {isCompactLayout ? (
         <nav className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between rounded-2xl bg-slate-900 px-3 py-2 text-xs text-white shadow-lg">

@@ -63,7 +63,6 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
         href: "/seller/products",
         icon: Package,
       },
-      { label: "Order Management", href: "/seller/orders", icon: ShoppingCart },
       { label: "Customers", href: "/seller/customers", icon: Users },
       { label: "Employees", href: "/seller/employees", icon: ShieldCheck },
       {
@@ -139,7 +138,9 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     role: "POS",
     routeBase: "/pos",
     modules: [
-      { label: "Order Dashboard", href: "/pos", icon: HandCoins },
+      { label: "Store Operations", href: "/pos", icon: HandCoins },
+      { label: "Sales Dashboard", href: "/pos?panel=dashboard", icon: ChartColumnIncreasing },
+      { label: "Online Orders", href: "/pos?panel=orders", icon: ShoppingCart },
       { label: "Printer Module", href: "/pos/printer", icon: Bluetooth },
     ],
   },

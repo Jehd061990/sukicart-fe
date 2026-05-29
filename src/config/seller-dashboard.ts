@@ -12,7 +12,6 @@ import {
   Package,
   Repeat2,
   ShieldCheck,
-  ShoppingCart,
   Sparkles,
   Store,
   TrendingUp,
@@ -135,14 +134,6 @@ export const SELLER_MODULE_CATALOG: SellerDashboardModule[] = [
     icon: Package,
     description: "Catalog, pricing, and product lifecycle.",
     requiredFeature: "products",
-  },
-  {
-    key: "orders",
-    label: "Orders",
-    href: "/seller/orders",
-    icon: ShoppingCart,
-    description: "Order queues and fulfillment performance.",
-    requiredFeature: "orders",
   },
   {
     key: "customers",

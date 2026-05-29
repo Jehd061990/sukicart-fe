@@ -61,6 +61,31 @@ export interface POSTaxSummaryResponse {
   };
 }
 
+export interface POSSalesPerformancePoint {
+  label: string;
+  walkIn: number;
+  online: number;
+  total: number;
+  orders: number;
+}
+
+export interface POSSalesPerformanceResponse {
+  branchId: string;
+  totals: {
+    walkIn: number;
+    online: number;
+    total: number;
+    orders: number;
+  };
+  range: {
+    preset: "today" | "yesterday" | "custom";
+    bucket: "hour" | "day";
+    from: string;
+    to: string;
+  };
+  series: POSSalesPerformancePoint[];
+}
+
 export interface DeviceSession {
   id: string;
   userId: string;
@@ -144,4 +169,83 @@ export interface UpgradePOSSlotsResponse {
   };
   usage: POSUsage;
   note: string;
+}
+
+export interface POSOnlineOrderParty {
+  id: string;
+  name: string;
+  phoneNumber?: string;
+  isOnline?: boolean;
+  isAvailable?: boolean;
+}
+
+export interface POSOnlineOrderItem {
+  productId: string;
+  name: string;
+  unit: "kg" | "pcs";
+  price: number;
+  quantity: number;
+  lineTotal: number;
+  variant?: string;
+  note?: string;
+}
+
+export interface POSOnlineOrder {
+  id: string;
+  status: string;
+  type: "ONLINE" | "POS";
+  branchId: string | null;
+  total: number;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  buyer: POSOnlineOrderParty | null;
+  seller: POSOnlineOrderParty | null;
+  rider: POSOnlineOrderParty | null;
+  assignedHandler: POSOnlineOrderParty | null;
+  assignedHandlerAt: string | null;
+  items: POSOnlineOrderItem[];
+}
+
+export interface POSOnlineOrderQueueCounters {
+  newOrders: number;
+  preparing: number;
+  ready: number;
+  outForDelivery: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface POSOnlineOrderQueueResponse {
+  branchId: string;
+  orders: POSOnlineOrder[];
+  counters: POSOnlineOrderQueueCounters;
+}
+
+export interface POSOnlineOrderMetricsResponse {
+  branchId: string;
+  counters: POSOnlineOrderQueueCounters & {
+    total: number;
+  };
+  kpi: {
+    avgMinutesToReady: number;
+    readySamples: number;
+    stalePreparingOrders: number;
+  };
+  range: {
+    from: string | null;
+    to: string | null;
+  };
+}
+
+export interface POSOnlineOrderDetailResponse {
+  branchId: string;
+  order: POSOnlineOrder;
+  timeline: Array<{
+    at: string;
+    label: string;
+    type?: string;
+    status?: string;
+    actorName?: string;
+  }>;
 }

@@ -20,10 +20,9 @@ This list is based on the Seller navigation catalog and module feature gates.
 |---|---|---|---|
 | Dashboard | /seller/dashboard | Plan-aware KPI and operations control center | dashboard |
 | Multi-Branch | /seller/branches | Branch-level operation management (BUSINESS flow) | multiBranch |
-| POS | /seller/pos | POS device account lifecycle and active session control | basicPOS |
+| POS | /seller/pos | POS device lifecycle, walk-in checkout, and online order handling | basicPOS |
 | Billing | /seller/billing | Subscription plan checkout, slot management, invoices, payment history | billing |
 | Products | /seller/products | Catalog CRUD, pricing, stock baseline, tax type | products |
-| Order Management | /seller/orders | Seller order queue, rider tracking, order action workflow | orders |
 | Customers | /seller/customers | Customer management (currently scaffolded if not implemented) | customers |
 | Employees | /seller/employees | Cashier/staff role operations (plan-locked if unavailable) | employees |
 | Inventory | /seller/inventory | Stock sync/update across seller products | inventory |
@@ -219,37 +218,30 @@ Route: `/seller/inventory`
   - update stock control
 - per-row stock update + save action
 
-## 7) Order Management Module Manual
+## 7) POS Online Orders Manual
 
-Route: `/seller/orders`
-
-Powered by SellerTrackingPanel.
+Route: `/pos` (Online Orders tab)
 
 ### 7.1 Purpose
 
-- monitor seller orders and rider movement
-- perform seller-side order lifecycle actions
+- manage online order queue directly inside POS
+- keep walk-in and online fulfillment in one operator interface
 
 ### 7.2 Main Contents
 
-- live seller order list cards with status and totals
-- track rider button for trackable statuses
-- tracking map with rider/seller/buyer context
-- live updates via delivery socket events
-- automatic polling and query invalidation
+- branch-shared online order queue by status tabs
+- order detail panel with lifecycle action buttons
+- rider assignment visibility and delivery-state progression
+- live queue refresh and notification hooks
 
-### 7.3 Seller Order Action Flows
+### 7.3 Current POS Order Action Flows
 
 - prepare order
-- mark ready for pickup
-- decline order (requires reason)
-- load pickup QR for rider handoff statuses
-
-### 7.4 Seller Location Share
-
-- shares seller location for delivery-relevant statuses
-- uses geolocation permission
-- pushes seller coordinates at interval while active order is tracked
+- mark ready
+- assign rider
+- mark picked up
+- complete order
+- transfer order request (manager workflow requires backend transfer endpoint)
 
 ## 8) Settings (Store Config) Manual
 
@@ -342,7 +334,7 @@ For module routes that exist in navigation but do not yet have dedicated impleme
 - identify next milestone or required upgrade
 
 3. Process Orders
-- use Order Management for active queue and rider tracking
+- use POS Online Orders tab for active queue and rider tracking
 
 4. Maintain Catalog and Stock
 - update products and inventory stock levels
