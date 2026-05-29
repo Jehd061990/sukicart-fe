@@ -50,6 +50,7 @@ export default function POSPrinterModulePage() {
   const configuredPrinterName = String(printingConfig.desktopPrinterName || "").trim() || undefined;
   const configuredBluetoothPrinter = printingConfig.bluetoothPrinter || null;
   const preferredPOSMode = storeConfigQuery.data?.store?.preferredPOSMode || "desktop";
+  const receiptPrinterEnabled = printingConfig.receiptPrinterEnabled !== false;
   const runtimeProfile = usePOSDeviceProfile(preferredPOSMode);
 
   const selectedBluetoothPrinter: ThermalPrinterDevice | undefined =
@@ -256,6 +257,43 @@ export default function POSPrinterModulePage() {
     void run();
   };
 
+  const toggleReceiptPrinterEnabled = (enabled: boolean) => {
+    if (!storeConfig) {
+      return;
+    }
+
+    const run = async () => {
+      setIsSavingPrinterDefault(true);
+      try {
+        await posService.updateStoreConfig({
+          configOverrides: {
+            printing: {
+              ...storeConfig.printing,
+              receiptPrinterEnabled: enabled,
+            },
+          },
+        });
+
+        await storeConfigQuery.refetch();
+        setPrintActionMessage(
+          enabled
+            ? "Receipt printer enabled. Queue alerts and print actions are active."
+            : "Receipt printer disabled. Queue alerts and print actions are paused.",
+        );
+      } catch (error) {
+        const message =
+          typeof error === "object" && error !== null && "message" in error
+            ? String(error.message)
+            : "Failed to update receipt printer setting";
+        setPrintActionMessage(message);
+      } finally {
+        setIsSavingPrinterDefault(false);
+      }
+    };
+
+    void run();
+  };
+
   if (role !== "POS") {
     return (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
@@ -418,6 +456,20 @@ export default function POSPrinterModulePage() {
                   type="checkbox"
                   checked={printerManager.autoReconnect}
                   onChange={(event) => printerManager.setAutoReconnect(event.target.checked)}
+                />
+              </label>
+              <label className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 sm:col-span-2">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Receipt Printer Available</span>
+                  <p className="text-[11px] text-slate-500">
+                    Disable if this POS terminal does not use a receipt printer.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={receiptPrinterEnabled}
+                  disabled={isSavingPrinterDefault}
+                  onChange={(event) => toggleReceiptPrinterEnabled(event.target.checked)}
                 />
               </label>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarRange } from "lucide-react";
 import { DateRange, DayPicker } from "react-day-picker";
@@ -117,12 +117,47 @@ const getPresetRange = (preset: SalesRangePreset): DateRange => {
   };
 };
 
+const MONTH_OPTIONS = [
+  { value: 0, label: "January" },
+  { value: 1, label: "February" },
+  { value: 2, label: "March" },
+  { value: 3, label: "April" },
+  { value: 4, label: "May" },
+  { value: 5, label: "June" },
+  { value: 6, label: "July" },
+  { value: 7, label: "August" },
+  { value: 8, label: "September" },
+  { value: 9, label: "October" },
+  { value: 10, label: "November" },
+  { value: 11, label: "December" },
+];
+
 export function SalesPerformancePanel() {
   const [preset, setPreset] = useState<SalesRangePreset>("today");
   const [selectedRange, setSelectedRange] = useState<DateRange | undefined>(() =>
     getPresetRange("today"),
   );
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
+  const [calendarMonths, setCalendarMonths] = useState(2);
+
+  const initialFrom = selectedRange?.from || new Date();
+  const initialTo = selectedRange?.to || initialFrom;
+  const [startMonth, setStartMonth] = useState(initialFrom.getMonth());
+  const [startYear, setStartYear] = useState(initialFrom.getFullYear());
+  const [endMonth, setEndMonth] = useState(initialTo.getMonth());
+  const [endYear, setEndYear] = useState(initialTo.getFullYear());
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const media = window.matchMedia("(min-width: 768px)");
+    const apply = () => setCalendarMonths(media.matches ? 2 : 1);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
 
   const fromDate = useMemo(
     () => (selectedRange?.from ? toDateInput(selectedRange.from) : ""),
@@ -135,11 +170,35 @@ export function SalesPerformancePanel() {
 
   const rangeLabel = useMemo(() => getRangeLabel(selectedRange), [selectedRange]);
 
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 11 }, (_, index) => currentYear - 5 + index);
+  }, []);
+
   const applyPreset = (nextPreset: SalesRangePreset) => {
     setPreset(nextPreset);
     if (nextPreset !== "custom") {
-      setSelectedRange(getPresetRange(nextPreset));
+      const nextRange = getPresetRange(nextPreset);
+      setSelectedRange(nextRange);
+      if (nextRange.from && nextRange.to) {
+        setStartMonth(nextRange.from.getMonth());
+        setStartYear(nextRange.from.getFullYear());
+        setEndMonth(nextRange.to.getMonth());
+        setEndYear(nextRange.to.getFullYear());
+      }
     }
+  };
+
+  const applyMonthYearRange = () => {
+    const from = new Date(startYear, startMonth, 1, 0, 0, 0, 0);
+    const to = new Date(endYear, endMonth + 1, 0, 23, 59, 59, 999);
+
+    if (to < from) {
+      return;
+    }
+
+    setPreset("custom");
+    setSelectedRange({ from, to });
   };
 
   const salesQuery = useQuery({
@@ -226,6 +285,71 @@ export function SalesPerformancePanel() {
                     <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("last_30_days")}>Last 30 Days</Button>
                   </div>
 
+                  <div className="mt-3 rounded-lg border border-slate-200 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Choose Start and End Month/Year</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-md border border-slate-200 p-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Start</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <select
+                            value={startMonth}
+                            onChange={(event) => setStartMonth(Number(event.target.value))}
+                            className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                          >
+                            {MONTH_OPTIONS.map((month) => (
+                              <option key={month.value} value={month.value}>
+                                {month.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={startYear}
+                            onChange={(event) => setStartYear(Number(event.target.value))}
+                            className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                          >
+                            {yearOptions.map((year) => (
+                              <option key={year} value={year}>
+                                {year}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-slate-200 p-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">End</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <select
+                            value={endMonth}
+                            onChange={(event) => setEndMonth(Number(event.target.value))}
+                            className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                          >
+                            {MONTH_OPTIONS.map((month) => (
+                              <option key={month.value} value={month.value}>
+                                {month.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={endYear}
+                            onChange={(event) => setEndYear(Number(event.target.value))}
+                            className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700"
+                          >
+                            {yearOptions.map((year) => (
+                              <option key={year} value={year}>
+                                {year}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center justify-end">
+                      <Button type="button" size="sm" onClick={applyMonthYearRange}>
+                        Apply Month/Year Range
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="mt-3 rounded-lg border border-slate-200 p-2">
                     <DayPicker
                       mode="range"
@@ -233,8 +357,19 @@ export function SalesPerformancePanel() {
                       onSelect={(nextRange) => {
                         setPreset("custom");
                         setSelectedRange(nextRange);
+                        if (nextRange?.from) {
+                          setStartMonth(nextRange.from.getMonth());
+                          setStartYear(nextRange.from.getFullYear());
+                        }
+                        if (nextRange?.to) {
+                          setEndMonth(nextRange.to.getMonth());
+                          setEndYear(nextRange.to.getFullYear());
+                        }
                       }}
-                      numberOfMonths={2}
+                      numberOfMonths={calendarMonths}
+                      captionLayout="dropdown"
+                      startMonth={new Date(Math.min(...yearOptions), 0)}
+                      endMonth={new Date(Math.max(...yearOptions), 11)}
                       defaultMonth={selectedRange?.from || new Date()}
                     />
                   </div>

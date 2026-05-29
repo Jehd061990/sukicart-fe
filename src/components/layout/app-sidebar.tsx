@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronsLeft, ChevronsRight, LogOut, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ export function AppSidebar({
 
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.user?.role);
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -146,6 +147,35 @@ export function AppSidebar({
   const renderSidebarContent = (isMobile: boolean) => {
     const isCollapsed = !isMobile && (forceDesktopCollapsed || isDesktopCollapsed);
 
+    const isNavItemActive = (href: string) => {
+      if (!href.includes("?")) {
+        if (pathname !== href) {
+          return false;
+        }
+
+        if (href === "/pos") {
+          const activePanel = searchParams.get("panel");
+          return !activePanel || activePanel === "sales";
+        }
+
+        return true;
+      }
+
+      const [targetPath, targetQueryString] = href.split("?");
+      if (pathname !== targetPath) {
+        return false;
+      }
+
+      const targetQuery = new URLSearchParams(targetQueryString || "");
+      for (const [key, value] of targetQuery.entries()) {
+        if (searchParams.get(key) !== value) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
     return (
     <>
       <div
@@ -195,7 +225,7 @@ export function AppSidebar({
         <nav>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = isNavItemActive(item.href);
 
             return (
               <Link

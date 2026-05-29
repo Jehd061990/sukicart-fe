@@ -13,6 +13,7 @@ import { DiscountModal } from "@/components/pos/DiscountModal";
 import { OnlineOrdersPanel } from "@/components/pos/online-orders-panel";
 import { PrintQueuePanel } from "@/components/pos/print-queue-panel";
 import { ProductCard } from "@/components/pos/ProductCard";
+import { ReceiptHistoryPanel } from "@/components/pos/receipt-history-panel";
 import { SalesPerformancePanel } from "@/components/pos/sales-performance-panel";
 import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ import { usePOSModePreference } from "@/hooks/pos/use-pos-mode-preference";
 import { usePOSOfflineSupport } from "@/hooks/pos/use-pos-offline-support";
 import { enqueuePOSOrder } from "@/hooks/pwa/use-sync-queue";
 import { printerService } from "@/lib/pos-printing/printer-service";
-import { openReceiptPrintWindow } from "@/lib/pos-printing/receipt-template";
+import { saveReceiptToPdfFile } from "@/lib/pos-printing/receipt-template";
 import { ReceiptPayload, ThermalPrinterDevice } from "@/lib/pos-printing/types";
 import { computeTaxSummary } from "@/lib/tax/pos-tax";
 import { useAuthStore } from "@/store/auth.store";
@@ -113,6 +114,8 @@ const barcodeVariants = (value: string) => {
   return Array.from(variants);
 };
 
+const POS_QUEUE_DISMISS_STORAGE_KEY = "sukigo:pos-queue-dismissed-attempts";
+
 export default function POSPage() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
@@ -132,7 +135,10 @@ export default function POSPage() {
   const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
   const [showScannerPanel, setShowScannerPanel] = useState(true);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
-  const [activePOSPanel, setActivePOSPanel] = useState<"sales" | "orders" | "dashboard">("sales");
+  const [activePOSPanel, setActivePOSPanel] = useState<"sales" | "orders" | "dashboard" | "receipts">("sales");
+  const [failedReceiptsHydrated, setFailedReceiptsHydrated] = useState(false);
+  const [dismissedQueueAttemptsById, setDismissedQueueAttemptsById] = useState<Record<string, number>>({});
+  const [reprintingReceiptId, setReprintingReceiptId] = useState<string | null>(null);
   const [printActionMessage, setPrintActionMessage] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -149,11 +155,15 @@ export default function POSPage() {
   const latestPrintStatus = usePOSPrintStore((state) => state.latestPrintStatus);
   const latestPrintMessage = usePOSPrintStore((state) => state.latestPrintMessage);
   const failedReceipts = usePOSPrintStore((state) => state.failedReceipts);
+  const receiptHistory = usePOSPrintStore((state) => state.receiptHistory);
   const hydrateFailedReceipts = usePOSPrintStore((state) => state.hydrateFailedReceipts);
+  const hydrateReceiptHistory = usePOSPrintStore((state) => state.hydrateReceiptHistory);
   const setLatestStatus = usePOSPrintStore((state) => state.setLatestStatus);
   const enqueueFailedReceipt = usePOSPrintStore((state) => state.enqueueFailedReceipt);
   const markRetried = usePOSPrintStore((state) => state.markRetried);
   const removeFailedReceipt = usePOSPrintStore((state) => state.removeFailedReceipt);
+  const recordReceiptGenerated = usePOSPrintStore((state) => state.recordReceiptGenerated);
+  const markReceiptStatus = usePOSPrintStore((state) => state.markReceiptStatus);
 
   const productsQuery = useQuery({
     queryKey: ["products"],
@@ -180,6 +190,7 @@ export default function POSPage() {
   const configuredPaperSize = printingConfig.paperSize || undefined;
   const configuredPrinterName = String(printingConfig.desktopPrinterName || "").trim() || undefined;
   const configuredBluetoothPrinter = printingConfig.bluetoothPrinter || null;
+  const receiptPrinterEnabled = printingConfig.receiptPrinterEnabled !== false;
   const autoPrintEnabled = printingConfig.autoPrint !== false;
   const taxConfig = storeConfig?.tax;
   const preferredPOSMode = storeConfigQuery.data?.store?.preferredPOSMode || "desktop";
@@ -257,6 +268,38 @@ export default function POSPage() {
   const categoryThumbClassName =
     categoryThumbnailShape === "circle" ? "rounded-full" : "rounded-md";
   const activeBluetoothPrinter = selectedBluetoothPrinter;
+  const printerConnectionQuery = useQuery({
+    queryKey: [
+      "pos-printer-connection",
+      effectivePOSMode,
+      preferredPrinterAdapter,
+      configuredPrinterName,
+      activeBluetoothPrinter?.id,
+      receiptPrinterEnabled,
+    ],
+    queryFn: async () => {
+      const result = await printerService.getConnectionStatus(
+        {
+          runtimeProfile,
+          preferBluetooth: runtimeProfile.isAndroid,
+          preferredAdapter: preferredPrinterAdapter,
+          printerName: configuredPrinterName,
+          selectedPrinter: activeBluetoothPrinter,
+        },
+        activeBluetoothPrinter,
+      );
+
+      return result;
+    },
+    enabled: receiptPrinterEnabled,
+    refetchInterval: 12000,
+  });
+
+  const canUsePrinter =
+    receiptPrinterEnabled && printerConnectionQuery.data?.status === "CONNECTED";
+  const printerUnavailableReason = !receiptPrinterEnabled
+    ? "Receipt printer is disabled in Printer Module settings"
+    : "Printer is not connected";
   const printerAdapterPipeline = printerService.getAdapterPipeline({
     runtimeProfile,
     preferBluetooth: runtimeProfile.printerLikelyWireless,
@@ -328,6 +371,15 @@ export default function POSPage() {
       return matchesCategory && matchesText;
     });
   }, [activeCategory, products, search]);
+
+  const visibleFailedReceipts = useMemo(
+    () =>
+      failedReceipts.filter((entry) => {
+        const dismissedAttempts = dismissedQueueAttemptsById[entry.id];
+        return dismissedAttempts === undefined || entry.attempts > dismissedAttempts;
+      }),
+    [dismissedQueueAttemptsById, failedReceipts],
+  );
 
   const itemCount = useMemo(
     () => items.reduce((sum, item) => sum + item.quantity, 0),
@@ -443,8 +495,84 @@ export default function POSPage() {
   };
 
   useEffect(() => {
-    void hydrateFailedReceipts();
+    let cancelled = false;
+
+    const run = async () => {
+      await hydrateFailedReceipts();
+      if (!cancelled) {
+        setFailedReceiptsHydrated(true);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [hydrateFailedReceipts]);
+
+  useEffect(() => {
+    void hydrateReceiptHistory();
+  }, [hydrateReceiptHistory]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(POS_QUEUE_DISMISS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (parsed && typeof parsed === "object") {
+        setDismissedQueueAttemptsById(parsed);
+      }
+    } catch {
+      // Ignore malformed local storage payload.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!Object.keys(dismissedQueueAttemptsById).length) {
+      window.localStorage.removeItem(POS_QUEUE_DISMISS_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(
+      POS_QUEUE_DISMISS_STORAGE_KEY,
+      JSON.stringify(dismissedQueueAttemptsById),
+    );
+  }, [dismissedQueueAttemptsById]);
+
+  useEffect(() => {
+    if (!failedReceiptsHydrated) {
+      return;
+    }
+
+    setDismissedQueueAttemptsById((previous) => {
+      const currentIds = new Set(failedReceipts.map((entry) => entry.id));
+      let changed = false;
+      const next: Record<string, number> = {};
+
+      Object.entries(previous).forEach(([id, attempts]) => {
+        if (currentIds.has(id)) {
+          next[id] = attempts;
+          return;
+        }
+
+        changed = true;
+      });
+
+      return changed ? next : previous;
+    });
+  }, [failedReceipts, failedReceiptsHydrated]);
 
   useEffect(() => {
     if (!isDesktopLayout) {
@@ -536,7 +664,13 @@ export default function POSPage() {
   };
 
   const runReceiptPrint = async (receipt: ReceiptPayload) => {
+    if (!receiptPrinterEnabled) {
+      markReceiptStatus(receipt.receiptId, "PENDING_PRINT", "Receipt printer disabled by POS setting");
+      return;
+    }
+
     setLatestStatus("PRINTING", "Sending receipt to printer...");
+    markReceiptStatus(receipt.receiptId, "PENDING_PRINT", "Sending receipt to printer...");
 
     const result = await printerService.printReceipt(receipt, {
       runtimeProfile,
@@ -559,10 +693,13 @@ export default function POSPage() {
     setLatestStatus(result.status, result.message);
 
     if (result.status !== "PRINT_SUCCESS") {
+      markReceiptStatus(receipt.receiptId, "PRINT_FAILED", result.message);
       enqueueFailedReceipt(receipt, result.status, result.message);
       setPrintActionMessage("Receipt printing failed. Retry?");
       return;
     }
+
+    markReceiptStatus(receipt.receiptId, "PRINT_SUCCESS", result.message);
 
     setPrintActionMessage("Receipt printed successfully.");
   };
@@ -624,6 +761,13 @@ export default function POSPage() {
     },
     onSuccess: async (result) => {
       const receipt = buildReceiptPayload(result.orderId, result.itemSnapshot);
+      recordReceiptGenerated(
+        receipt,
+        "PENDING_PRINT",
+        result.queuedOffline
+          ? "Order queued offline. Pending print."
+          : "Receipt generated",
+      );
 
       clearCart();
       setDiscountAmount(0);
@@ -632,13 +776,23 @@ export default function POSPage() {
       if (result.queuedOffline) {
         setScannerStatus("Offline: order queued for sync");
         setScannerStatusTone("warning");
-        enqueueFailedReceipt(receipt, "PRINTER_OFFLINE", "Order queued offline. Print later.");
+        if (receiptPrinterEnabled) {
+          enqueueFailedReceipt(receipt, "PRINTER_OFFLINE", "Order queued offline. Print later.");
+          markReceiptStatus(receipt.receiptId, "PRINT_FAILED", "Order queued offline. Print later.");
+        }
       } else {
         setScannerStatus(`Order created: ${result.orderId}`);
         setScannerStatusTone("success");
-        if (autoPrintEnabled) {
+        if (autoPrintEnabled && receiptPrinterEnabled) {
           await runReceiptPrint(receipt);
         } else {
+          markReceiptStatus(
+            receipt.receiptId,
+            "PENDING_PRINT",
+            receiptPrinterEnabled
+              ? "Receipt created. Auto print is disabled."
+              : "Receipt printer disabled by POS setting",
+          );
           setLatestStatus("PRINT_SUCCESS", "Receipt created. Auto print is disabled in settings.");
         }
       }
@@ -665,7 +819,13 @@ export default function POSPage() {
       return;
     }
 
+    if (!canUsePrinter) {
+      setPrintActionMessage(printerUnavailableReason);
+      return;
+    }
+
     setLatestStatus("PRINTING", "Retrying queued receipt...");
+    markReceiptStatus(failed.id, "PENDING_PRINT", "Retrying queued receipt...");
     const result = await printerService.printReceipt(failed.receipt, {
       runtimeProfile,
       preferBluetooth: runtimeProfile.isAndroid,
@@ -688,7 +848,10 @@ export default function POSPage() {
     setLatestStatus(result.status, result.message);
 
     if (result.status === "PRINT_SUCCESS") {
+      markReceiptStatus(failed.id, "PRINT_SUCCESS", result.message);
       removeFailedReceipt(failed.id);
+    } else {
+      markReceiptStatus(failed.id, "PRINT_FAILED", result.message);
     }
   };
 
@@ -708,8 +871,52 @@ export default function POSPage() {
     }
   };
 
+  const reprintFromHistory = async (receiptId: string) => {
+    const target = receiptHistory.find((entry) => entry.id === receiptId);
+    if (!target) {
+      return;
+    }
+
+    if (!canUsePrinter) {
+      setPrintActionMessage(printerUnavailableReason);
+      return;
+    }
+
+    setReprintingReceiptId(receiptId);
+    markReceiptStatus(receiptId, "PENDING_PRINT", "Manual reprint requested");
+
+    try {
+      const result = await printerService.printReceipt(target.receipt, {
+        runtimeProfile,
+        preferBluetooth: runtimeProfile.isAndroid,
+        preferredAdapter: preferredPrinterAdapter,
+        printerName: configuredPrinterName,
+        selectedPrinter: activeBluetoothPrinter,
+        printerSettings:
+          activeBluetoothPrinter && runtimeProfile.isAndroid
+            ? {
+                printerName: activeBluetoothPrinter.name,
+                printerMac: activeBluetoothPrinter.macAddress || activeBluetoothPrinter.id,
+                connectionType: "bluetooth",
+                paperSize: configuredPaperSize || "58mm",
+                autoReconnect: configuredBluetoothPrinter?.autoReconnect !== false,
+              }
+            : undefined,
+      });
+
+      setLatestStatus(result.status, result.message);
+      if (result.status === "PRINT_SUCCESS") {
+        markReceiptStatus(receiptId, "PRINT_SUCCESS", result.message);
+      } else {
+        markReceiptStatus(receiptId, "PRINT_FAILED", result.message);
+      }
+    } finally {
+      setReprintingReceiptId(null);
+    }
+  };
+
   const { online, pendingSyncCount } = usePOSOfflineSupport({
-    hasFailedReceipts: failedReceipts.length > 0,
+    hasFailedReceipts: receiptPrinterEnabled && failedReceipts.length > 0,
     retryLatestFailedReceipt,
   });
 
@@ -717,6 +924,11 @@ export default function POSPage() {
     const panel = searchParams.get("panel");
     if (panel === "orders") {
       setActivePOSPanel("orders");
+      return;
+    }
+
+    if (panel === "receipts") {
+      setActivePOSPanel("receipts");
       return;
     }
 
@@ -754,19 +966,19 @@ export default function POSPage() {
   };
 
 
-  const saveReceiptAsPdf = (receiptId: string) => {
+  const saveReceiptAsPdf = async (receiptId: string) => {
     const failed = failedReceipts.find((entry) => entry.id === receiptId);
     if (!failed) {
       return;
     }
 
-    const opened = openReceiptPrintWindow(failed.receipt);
-    if (!opened) {
-      setLatestStatus("PRINT_FAILED", "Could not open print preview for PDF save");
+    const saved = await saveReceiptToPdfFile(failed.receipt);
+    if (!saved) {
+      setLatestStatus("PRINT_FAILED", "Could not generate PDF file for this receipt");
       return;
     }
 
-    setLatestStatus("PRINT_SUCCESS", "Receipt preview opened. Choose Save as PDF.");
+    setLatestStatus("PRINT_SUCCESS", "Receipt PDF downloaded successfully.");
   };
 
   if (role !== "POS") {
@@ -788,7 +1000,7 @@ export default function POSPage() {
 
   return (
     <div
-      className={`relative h-full overflow-hidden bg-slate-100 ${
+      className={`relative h-full ${activePOSPanel === "dashboard" || activePOSPanel === "receipts" ? "overflow-y-auto" : "overflow-hidden"} bg-slate-100 ${
         isCompactLayout ? "pb-28" : "pb-6"
       }`}
     >
@@ -920,19 +1132,30 @@ export default function POSPage() {
 
       {activePOSPanel === "sales" ? (
         <>
-          <PrintQueuePanel
-            receipts={failedReceipts}
-            onRetry={(receiptId) => {
-              void retryFailedReceipt(receiptId);
-            }}
-            onRetryAll={() => {
-              void retryAllFailedReceipts();
-            }}
-            onReconnect={() => {
-              void reconnectPrinter();
-            }}
-            onSavePdf={saveReceiptAsPdf}
-          />
+          {receiptPrinterEnabled && visibleFailedReceipts.length > 0 ? (
+            <PrintQueuePanel
+              receipts={visibleFailedReceipts}
+              onRetry={(receiptId) => {
+                void retryFailedReceipt(receiptId);
+              }}
+              onRetryAll={() => {
+                void retryAllFailedReceipts();
+              }}
+              onReconnect={() => {
+                void reconnectPrinter();
+              }}
+              onSavePdf={saveReceiptAsPdf}
+              onClose={() => {
+                setDismissedQueueAttemptsById((previous) => {
+                  const next = { ...previous };
+                  visibleFailedReceipts.forEach((entry) => {
+                    next[entry.id] = entry.attempts;
+                  });
+                  return next;
+                });
+              }}
+            />
+          ) : null}
 
           <div
             className={`grid h-full gap-4 p-3 ${desktopGridClass}`}
@@ -1286,6 +1509,16 @@ export default function POSPage() {
         <div className="px-3 pb-3">
           <OnlineOrdersPanel />
         </div>
+      ) : activePOSPanel === "receipts" ? (
+        <ReceiptHistoryPanel
+          receipts={receiptHistory}
+          onReprint={(receiptId) => {
+            void reprintFromHistory(receiptId);
+          }}
+          canReprint={canUsePrinter}
+          reprintDisabledMessage={printerUnavailableReason}
+          reprintingReceiptId={reprintingReceiptId}
+        />
       ) : (
         <SalesPerformancePanel />
       )}

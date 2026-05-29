@@ -68,6 +68,7 @@ export interface StorePrintingConfig {
   preferredAdapter?: "browser" | "bluetooth" | "airprint" | "local-bridge";
   paperSize?: "58mm" | "80mm";
   autoPrint?: boolean;
+  receiptPrinterEnabled?: boolean;
   desktopPrinterName?: string;
   bluetoothPrinter?: {
     printerName: string;

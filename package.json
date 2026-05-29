@@ -29,6 +29,7 @@
     "cordova-plugin-bluetooth-serial": "^0.4.7",
     "framer-motion": "^12.38.0",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",

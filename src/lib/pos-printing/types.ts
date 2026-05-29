@@ -2,6 +2,7 @@ import { POSRuntimeProfile } from "@/lib/pos-adaptive/types";
 
 export type PrintStatus =
   | "PRINTING"
+  | "PENDING_PRINT"
   | "PRINT_SUCCESS"
   | "PRINT_FAILED"
   | "PRINTER_OFFLINE"
@@ -108,6 +109,17 @@ export interface PrintQueueItem {
   status: PrintStatus;
   reason: string;
   createdAt: string;
+  lastTriedAt?: string;
+  attempts: number;
+}
+
+export interface ReceiptHistoryEntry {
+  id: string;
+  receipt: ReceiptPayload;
+  status: "PRINT_SUCCESS" | "PRINT_FAILED" | "PENDING_PRINT";
+  message: string;
+  createdAt: string;
+  updatedAt: string;
   lastTriedAt?: string;
   attempts: number;
 }

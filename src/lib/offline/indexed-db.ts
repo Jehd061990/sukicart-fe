@@ -1,4 +1,4 @@
-import { PrintStatus, ReceiptPayload } from "@/lib/pos-printing/types";
+import { PrintStatus, ReceiptHistoryEntry, ReceiptPayload } from "@/lib/pos-printing/types";
 
 export type SyncQueueEntry = {
   id?: number;
@@ -28,7 +28,7 @@ export type FailedReceiptQueueEntry = {
 };
 
 const DB_NAME = "sukicart-offline-db";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORES = {
   products: "products",
@@ -36,6 +36,7 @@ const STORES = {
   orders: "orders",
   syncQueue: "syncQueue",
   failedPrintQueue: "failedPrintQueue",
+  receiptHistory: "receiptHistory",
   meta: "meta",
 } as const;
 
@@ -67,6 +68,12 @@ const openDatabase = (): Promise<IDBDatabase> => {
 
       if (!db.objectStoreNames.contains(STORES.failedPrintQueue)) {
         db.createObjectStore(STORES.failedPrintQueue, {
+          keyPath: "id",
+        });
+      }
+
+      if (!db.objectStoreNames.contains(STORES.receiptHistory)) {
+        db.createObjectStore(STORES.receiptHistory, {
           keyPath: "id",
         });
       }
@@ -203,6 +210,22 @@ export const offlineDb = {
     );
 
     return (queue || []).sort(
+      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    );
+  },
+
+  async upsertReceiptHistory(entry: ReceiptHistoryEntry) {
+    await withStore(STORES.receiptHistory, "readwrite", (store) => store.put(entry));
+  },
+
+  async getReceiptHistory() {
+    const rows = await withStore<ReceiptHistoryEntry[]>(
+      STORES.receiptHistory,
+      "readonly",
+      (store) => store.getAll(),
+    );
+
+    return (rows || []).sort(
       (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
     );
   },

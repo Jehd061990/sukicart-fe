@@ -138,9 +138,10 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     role: "POS",
     routeBase: "/pos",
     modules: [
-      { label: "Store Operations", href: "/pos", icon: HandCoins },
       { label: "Sales Dashboard", href: "/pos?panel=dashboard", icon: ChartColumnIncreasing },
+      { label: "Store Operations", href: "/pos", icon: HandCoins },
       { label: "Online Orders", href: "/pos?panel=orders", icon: ShoppingCart },
+      { label: "Receipt History", href: "/pos?panel=receipts", icon: Receipt },
       { label: "Printer Module", href: "/pos/printer", icon: Bluetooth },
     ],
   },
