@@ -1,7 +1,13 @@
 import { apiClient } from "@/lib/api/client";
+import { SellerDashboardSummaryResponse } from "@/types/seller-dashboard";
 import { SellerRegistrationFormValues } from "@/types/seller-registration";
 
 export const sellerService = {
+  getDashboardSummary: async () => {
+    const { data } = await apiClient.get<SellerDashboardSummaryResponse>("/sellers/dashboard-summary");
+    return data;
+  },
+
   register: async (payload: SellerRegistrationFormValues) => {
     const formData = new FormData();
 

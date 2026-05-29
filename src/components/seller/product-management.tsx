@@ -398,12 +398,12 @@ export function ProductManagement() {
 
       {isModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-background p-5 shadow-xl">
+          <div className="w-full max-w-lg rounded-2xl bg-background p-5 shadow-xl overflow-x-auto">
             <h2 className="text-lg font-semibold">
               {editingProduct ? "Edit Product" : "Add Product"}
             </h2>
 
-            <form className="mt-4 space-y-3" onSubmit={onSubmit}>
+            <form className="mt-4 space-y-3 min-h-[600px]" onSubmit={onSubmit}>
               <Input
                 required
                 placeholder="Product name"

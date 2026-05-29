@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
+import { sellerService } from "@/lib/api/services/seller.service";
 import { subscriptionService } from "@/lib/api/services/subscription.service";
 import {
   SELLER_FEATURES_BY_PLAN,
@@ -36,6 +37,21 @@ const parsePermissionInput = (rawValue: string) =>
     ),
   );
 
+const PH_CURRENCY = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  maximumFractionDigits: 0,
+});
+
+const toDeltaLabel = (value: number | null, suffix: string, fallback: string) => {
+  if (value === null || Number.isNaN(value)) {
+    return fallback;
+  }
+
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(1)}% ${suffix}`;
+};
+
 export default function SellerDashboardPage() {
   const queryClient = useQueryClient();
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
@@ -61,6 +77,11 @@ export default function SellerDashboardPage() {
   const accessControlQuery = useQuery({
     queryKey: ["seller-access-control"],
     queryFn: subscriptionService.getAccessControl,
+  });
+
+  const dashboardSummaryQuery = useQuery({
+    queryKey: ["seller-dashboard-summary"],
+    queryFn: sellerService.getDashboardSummary,
   });
 
   const updateAccessMutation = useMutation({
@@ -128,6 +149,85 @@ export default function SellerDashboardPage() {
       .map((id) => widgetMap.get(id))
       .filter((widget): widget is NonNullable<typeof widget> => Boolean(widget));
   }, [personalizedWidgetOrder, widgets]);
+
+  const summaryWidgetMetrics = useMemo(() => {
+    const summary = dashboardSummaryQuery.data?.summary;
+    if (!summary) {
+      return null;
+    }
+
+    return {
+      "today-sales": {
+        metric: PH_CURRENCY.format(summary.todaySales),
+        delta: toDeltaLabel(summary.todaySalesChangePct, "vs yesterday", "No sales yesterday"),
+        tone: summary.todaySalesChangePct !== null && summary.todaySalesChangePct < 0 ? "warning" : "success",
+      },
+      "total-orders": {
+        metric: String(summary.totalOrders),
+        delta: `${summary.recentTransactions} in the last 24 hours`,
+        tone: "neutral",
+      },
+      "product-count": {
+        metric: String(summary.productCount),
+        delta: `${summary.recentlyUpdatedProducts} recently updated`,
+        tone: "neutral",
+      },
+      "low-stock": {
+        metric: String(summary.lowStockCount),
+        delta: `${summary.criticalLowStockCount} critical items`,
+        tone: summary.lowStockCount > 0 ? "warning" : "success",
+      },
+      "recent-transactions": {
+        metric: String(summary.recentTransactions),
+        delta: "Last 24 hours",
+        tone: "neutral",
+      },
+      "revenue-analytics": {
+        metric: PH_CURRENCY.format(summary.monthlyRevenue),
+        delta: toDeltaLabel(summary.monthlyRevenueChangePct, "month-over-month", "No previous month baseline"),
+        tone: "success",
+      },
+      "monthly-sales": {
+        metric: PH_CURRENCY.format(summary.monthlyRevenue),
+        delta: "Rolling 30-day sales",
+        tone: "success",
+      },
+      "executive-revenue": {
+        metric: PH_CURRENCY.format(summary.monthlyRevenue),
+        delta: "Rolling 30-day revenue",
+        tone: "success",
+      },
+    } as Record<string, { metric: string; delta: string; tone: "success" | "warning" | "neutral" }>;
+  }, [dashboardSummaryQuery.data?.summary]);
+
+  const widgetMetrics = summaryWidgetMetrics;
+  const resolvedWidgets = useMemo(
+    () =>
+      sortedWidgets.map((widget) => {
+        const live = widgetMetrics?.[widget.id];
+        if (!live) {
+          return widget;
+        }
+
+        return {
+          ...widget,
+          metric: live.metric,
+          delta: live.delta,
+          tone: live.tone,
+        };
+      }),
+    [sortedWidgets, widgetMetrics],
+  );
+
+  const summaryChartData = dashboardSummaryQuery.data
+    ? {
+        FREE: dashboardSummaryQuery.data.charts.daily,
+        PRO: dashboardSummaryQuery.data.charts.weekly,
+        BUSINESS: dashboardSummaryQuery.data.charts.channels,
+      }
+    : null;
+
+  const liveChartData = summaryChartData?.[plan];
 
   const serverActivePermissions = subscriptionQuery.data?.subscription?.activePermissions || [];
   const serverOverrides = accessControlQuery.data?.overrides;
@@ -212,7 +312,7 @@ export default function SellerDashboardPage() {
             </section>
 
             <KPIWidgetGrid
-              widgets={sortedWidgets}
+              widgets={resolvedWidgets}
               hiddenWidgetIds={hiddenWidgetIds}
               onToggleHidden={toggleWidgetVisibility}
               onDragStart={setDraggedWidgetId}
@@ -228,7 +328,7 @@ export default function SellerDashboardPage() {
 
             <section className="grid gap-4 xl:grid-cols-3">
               <div className="xl:col-span-2">
-                <SalesOverviewChart plan={plan} />
+                <SalesOverviewChart plan={plan} data={liveChartData} />
               </div>
               <NotificationsFeed items={notifications} />
             </section>
