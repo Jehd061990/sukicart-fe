@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -117,7 +117,7 @@ const barcodeVariants = (value: string) => {
 const POS_QUEUE_DISMISS_STORAGE_KEY = "sukigo:pos-queue-dismissed-attempts";
 const POS_SCANNER_VISIBILITY_STORAGE_KEY = "sukigo:pos-show-scanner";
 
-export default function POSPage() {
+function POSPageContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -1714,5 +1714,13 @@ export default function POSPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function POSPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-sm text-slate-600">Loading POS...</div>}>
+      <POSPageContent />
+    </Suspense>
   );
 }

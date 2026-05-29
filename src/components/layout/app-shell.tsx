@@ -1,6 +1,6 @@
 "use client";
 
-import { PropsWithChildren, useState } from "react";
+import { PropsWithChildren, Suspense, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PanelLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
@@ -27,11 +27,17 @@ export function AppShell({ children }: PropsWithChildren) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-muted/30">
-      <AppSidebar
-        mobileOpen={isMobileSidebarOpen}
-        onMobileClose={() => setMobileSidebarPath(null)}
-        forceDesktopCollapsed={false}
-      />
+      <Suspense
+        fallback={
+          <aside className="hidden h-screen w-72 border-r border-slate-200 bg-white/70 md:block" />
+        }
+      >
+        <AppSidebar
+          mobileOpen={isMobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarPath(null)}
+          forceDesktopCollapsed={false}
+        />
+      </Suspense>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!hideTopHeader ? (
           <AppHeader onOpenMenu={() => setMobileSidebarPath(pathname)} />

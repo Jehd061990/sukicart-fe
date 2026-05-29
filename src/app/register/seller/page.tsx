@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { StepperForm } from "@/components/forms/stepper-form";
 
 export default function RegisterSellerPage() {
@@ -16,7 +17,13 @@ export default function RegisterSellerPage() {
         </p>
 
         <div className="mt-6">
-          <StepperForm />
+          <Suspense
+            fallback={
+              <p className="font-sans text-sm text-gray-600">Loading registration form...</p>
+            }
+          >
+            <StepperForm />
+          </Suspense>
         </div>
 
         <Link
