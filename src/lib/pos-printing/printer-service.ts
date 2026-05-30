@@ -122,6 +122,21 @@ export const printerService = {
   },
 
   async scanPrinters(context: PrintContext) {
+    if (context.preferredAdapter) {
+      const preferred = ADAPTER_BY_TYPE[context.preferredAdapter];
+      if (preferred?.scan) {
+        return preferred.scan(context);
+      }
+
+      if (preferred) {
+        return {
+          adapterType: preferred.type,
+          printers: [],
+          message: `${preferred.type} adapter does not support scanning`,
+        };
+      }
+    }
+
     const adapter = chooseAdapter(context);
     if (!adapter.scan) {
       return {

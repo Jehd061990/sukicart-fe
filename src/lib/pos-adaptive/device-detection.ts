@@ -41,12 +41,27 @@ export const detectPOSDevice = (): POSDeviceDetection => {
   const ua = navigator.userAgent || "";
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const capacitorPlatform =
+    typeof (window as Window & { Capacitor?: { getPlatform?: () => string } }).Capacitor
+      ?.getPlatform === "function"
+      ? String(
+          (window as Window & { Capacitor?: { getPlatform?: () => string } }).Capacitor?.getPlatform?.() ||
+            "",
+        ).toLowerCase()
+      : "";
+  const isNativeCapacitor =
+    typeof (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+      ?.isNativePlatform === "function"
+      ? Boolean(
+          (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.(),
+        )
+      : false;
 
-  const isAndroid = /Android/i.test(ua);
+  const isAndroid = /Android/i.test(ua) || capacitorPlatform === "android";
   const isIPhone = /iPhone/i.test(ua);
   const isIPad = /iPad/i.test(ua) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const isIOS = isIPhone || isIPad;
+  const isIOS = isIPhone || isIPad || capacitorPlatform === "ios";
 
   const isTouchCapable = navigator.maxTouchPoints > 0;
   const isTabletByUA = /Tablet|iPad/i.test(ua) || (isAndroid && !/Mobile/i.test(ua)) || isIPad;
@@ -57,7 +72,8 @@ export const detectPOSDevice = (): POSDeviceDetection => {
   const isMobile = !isTablet && (isAndroid || isIPhone || width < TABLET_MIN);
   const isPWA =
     window.matchMedia("(display-mode: standalone)").matches ||
-    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone) ||
+    isNativeCapacitor;
 
   const isDesktop = !isMobile && !isTablet;
 

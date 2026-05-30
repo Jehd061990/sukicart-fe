@@ -92,9 +92,10 @@ export const BrowserPrintAdapter: PrinterAdapter = {
 
 export const BluetoothPrintAdapter: PrinterAdapter = {
   type: "bluetooth",
-  isSupported: (context: PrintContext) => context.runtimeProfile.isAndroid,
+  isSupported: (context: PrintContext) =>
+    context.runtimeProfile.isAndroid || isAndroidBluetoothBridgeAvailable(),
   scan: async (context: PrintContext) => {
-    if (!context.runtimeProfile.isAndroid) {
+    if (!context.runtimeProfile.isAndroid && !isAndroidBluetoothBridgeAvailable()) {
       return scanResponse("bluetooth", "Bluetooth scanning is Android-only");
     }
 
@@ -110,7 +111,7 @@ export const BluetoothPrintAdapter: PrinterAdapter = {
     }
   },
   connect: async (context: PrintContext, printer) => {
-    if (!context.runtimeProfile.isAndroid) {
+    if (!context.runtimeProfile.isAndroid && !isAndroidBluetoothBridgeAvailable()) {
       return connectionFailure("bluetooth", "Bluetooth printing is Android-only");
     }
 
@@ -133,7 +134,7 @@ export const BluetoothPrintAdapter: PrinterAdapter = {
     }
   },
   disconnect: async (context: PrintContext) => {
-    if (!context.runtimeProfile.isAndroid) {
+    if (!context.runtimeProfile.isAndroid && !isAndroidBluetoothBridgeAvailable()) {
       return {
         adapterType: "bluetooth",
         status: "DISCONNECTED",
@@ -157,7 +158,7 @@ export const BluetoothPrintAdapter: PrinterAdapter = {
     }
   },
   getConnectionStatus: async (context: PrintContext) => {
-    if (!context.runtimeProfile.isAndroid) {
+    if (!context.runtimeProfile.isAndroid && !isAndroidBluetoothBridgeAvailable()) {
       return {
         adapterType: "bluetooth",
         status: "DISCONNECTED",
@@ -187,7 +188,7 @@ export const BluetoothPrintAdapter: PrinterAdapter = {
     }
   },
   printReceipt: async (payload: ReceiptPayload, context: PrintContext) => {
-    if (!context.runtimeProfile.isAndroid) {
+    if (!context.runtimeProfile.isAndroid && !isAndroidBluetoothBridgeAvailable()) {
       return failure("bluetooth", "BLUETOOTH_DISCONNECTED", "Bluetooth printing is Android-only");
     }
 
