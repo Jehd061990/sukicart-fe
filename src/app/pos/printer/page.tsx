@@ -6,7 +6,10 @@ import { useQuery } from "@tanstack/react-query";
 import { posService } from "@/lib/api/services/pos.service";
 import { usePOSDeviceProfile } from "@/hooks/pos/use-device-profile";
 import { usePrinterManager } from "@/hooks/pos/use-printer-manager";
-import { getAndroidBluetoothDiagnostics } from "@/lib/pos-printing/bridge-contracts";
+import {
+  getAndroidBluetoothDiagnostics,
+  isAndroidBluetoothBridgeAvailable,
+} from "@/lib/pos-printing/bridge-contracts";
 import { printerService } from "@/lib/pos-printing/printer-service";
 import { ThermalPrinterDevice } from "@/lib/pos-printing/types";
 import { useAuthStore } from "@/store/auth.store";
@@ -52,6 +55,11 @@ export default function POSPrinterModulePage() {
   const preferredPOSMode = storeConfigQuery.data?.store?.preferredPOSMode || "desktop";
   const receiptPrinterEnabled = printingConfig.receiptPrinterEnabled !== false;
   const runtimeProfile = usePOSDeviceProfile(preferredPOSMode);
+  const hasNativeBluetoothBridge = isAndroidBluetoothBridgeAvailable();
+  const preferNativeBluetooth = runtimeProfile.isAndroid || hasNativeBluetoothBridge;
+  const effectivePrinterAdapter = preferNativeBluetooth
+    ? "bluetooth"
+    : preferredPrinterAdapter;
 
   const selectedBluetoothPrinter: ThermalPrinterDevice | undefined =
     configuredBluetoothPrinter && (configuredBluetoothPrinter.printerMac || configuredBluetoothPrinter.printerName)
@@ -68,8 +76,8 @@ export default function POSPrinterModulePage() {
   const printerManager = usePrinterManager({
     context: {
       runtimeProfile,
-      preferBluetooth: runtimeProfile.isAndroid,
-      preferredAdapter: preferredPrinterAdapter,
+      preferBluetooth: preferNativeBluetooth,
+      preferredAdapter: effectivePrinterAdapter,
       printerName: configuredPrinterName,
       selectedPrinter: selectedBluetoothPrinter,
       printerSettings:
@@ -88,8 +96,8 @@ export default function POSPrinterModulePage() {
   const activeBluetoothPrinter = printerManager.selectedPrinter || selectedBluetoothPrinter;
 
   const adapterLabel = useMemo(
-    () => printerService.getPreferredAdapter(runtimeProfile, runtimeProfile.isAndroid, preferredPrinterAdapter),
-    [runtimeProfile, preferredPrinterAdapter],
+    () => printerService.getPreferredAdapter(runtimeProfile, preferNativeBluetooth, effectivePrinterAdapter),
+    [effectivePrinterAdapter, preferNativeBluetooth, runtimeProfile],
   );
 
   useEffect(() => {
