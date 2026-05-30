@@ -203,6 +203,9 @@ function POSPageContent() {
     dismissOnboarding,
   } = usePOSModePreference(preferredPOSMode);
   const runtimeProfile = usePOSDeviceProfile(effectivePOSMode);
+  const effectivePrinterAdapter = runtimeProfile.isAndroid
+    ? "bluetooth"
+    : preferredPrinterAdapter;
   const isCompactLayout =
     runtimeProfile.cartPlacement === "bottom-sheet";
   const isTabletLayout = runtimeProfile.runtimeMode === "tablet";
@@ -273,7 +276,7 @@ function POSPageContent() {
     queryKey: [
       "pos-printer-connection",
       effectivePOSMode,
-      preferredPrinterAdapter,
+      effectivePrinterAdapter,
       configuredPrinterName,
       activeBluetoothPrinter?.id,
       receiptPrinterEnabled,
@@ -283,7 +286,7 @@ function POSPageContent() {
         {
           runtimeProfile,
           preferBluetooth: runtimeProfile.isAndroid,
-          preferredAdapter: preferredPrinterAdapter,
+          preferredAdapter: effectivePrinterAdapter,
           printerName: configuredPrinterName,
           selectedPrinter: activeBluetoothPrinter,
         },
@@ -304,7 +307,7 @@ function POSPageContent() {
   const printerAdapterPipeline = printerService.getAdapterPipeline({
     runtimeProfile,
     preferBluetooth: runtimeProfile.printerLikelyWireless,
-    preferredAdapter: preferredPrinterAdapter,
+    preferredAdapter: effectivePrinterAdapter,
     printerName: configuredPrinterName,
     selectedPrinter: activeBluetoothPrinter,
   });
@@ -703,7 +706,7 @@ function POSPageContent() {
     const result = await printerService.printReceipt(receipt, {
       runtimeProfile,
       preferBluetooth: runtimeProfile.isAndroid,
-      preferredAdapter: preferredPrinterAdapter,
+      preferredAdapter: effectivePrinterAdapter,
       printerName: configuredPrinterName,
       selectedPrinter: activeBluetoothPrinter,
       printerSettings:
@@ -857,7 +860,7 @@ function POSPageContent() {
     const result = await printerService.printReceipt(failed.receipt, {
       runtimeProfile,
       preferBluetooth: runtimeProfile.isAndroid,
-      preferredAdapter: preferredPrinterAdapter,
+      preferredAdapter: effectivePrinterAdapter,
       printerName: configuredPrinterName,
       selectedPrinter: activeBluetoothPrinter,
       printerSettings:
@@ -917,7 +920,7 @@ function POSPageContent() {
       const result = await printerService.printReceipt(target.receipt, {
         runtimeProfile,
         preferBluetooth: runtimeProfile.isAndroid,
-        preferredAdapter: preferredPrinterAdapter,
+        preferredAdapter: effectivePrinterAdapter,
         printerName: configuredPrinterName,
         selectedPrinter: activeBluetoothPrinter,
         printerSettings:
@@ -972,14 +975,14 @@ function POSPageContent() {
     const adapter = printerService.getPreferredAdapter(
       runtimeProfile,
       runtimeProfile.isAndroid,
-      preferredPrinterAdapter,
+      effectivePrinterAdapter,
     );
     setLatestStatus("PRINTING", `Reconnecting ${adapter} printer...`);
     const result = await printerService.connectPrinter(
       {
         runtimeProfile,
         preferBluetooth: runtimeProfile.isAndroid,
-        preferredAdapter: preferredPrinterAdapter,
+        preferredAdapter: effectivePrinterAdapter,
         printerName: configuredPrinterName,
         selectedPrinter: activeBluetoothPrinter,
       },

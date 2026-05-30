@@ -205,12 +205,11 @@ export const BluetoothPrintAdapter: PrinterAdapter = {
       }
     }
 
-    const opened = openReceiptPrintWindow(payload);
-    if (!opened) {
-      return failure("bluetooth", "PRINT_FAILED", "Bluetooth fallback print window blocked");
-    }
-
-    return success("bluetooth", "Queued to Bluetooth adapter fallback");
+    return failure(
+      "bluetooth",
+      "BLUETOOTH_DISCONNECTED",
+      "Android Bluetooth bridge unavailable. Connect or install the printer bridge plugin.",
+    );
   },
 };
 
