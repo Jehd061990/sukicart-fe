@@ -105,7 +105,7 @@ const LANDING_CONTENT: Record<
       buyerTitle: "Buyer",
       buyerItems: ["Browse stores", "Add to cart", "Track delivery"],
       sellerTitle: "Seller",
-      sellerItems: ["Register any store type", "Add products or menu", "Sell via POS + online"],
+      sellerItems: ["Register any store type", "Add inventories or menu", "Sell via POS + online"],
     },
     featuresTitle: "Built for daily operations across store types",
     features: [
@@ -290,7 +290,7 @@ const LANDING_CONTENT: Record<
       buyerTitle: "Buyer",
       buyerItems: ["Browse sa stores", "Add to cart", "Track delivery"],
       sellerTitle: "Seller",
-      sellerItems: ["Register bisan unsang store type", "Add products o menu", "Baligya via POS + online"],
+      sellerItems: ["Register bisan unsang store type", "Add inventories o menu", "Baligya via POS + online"],
     },
     featuresTitle: "Gibuhat para sa adlaw-adlaw nga operasyon sa lain-laing tindahan",
     features: [

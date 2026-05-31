@@ -54,7 +54,7 @@ export function CheckoutModal({
         <SimplebarScroll className="min-h-0 flex-1 pr-1" contentClassName="space-y-2 pb-2">
           {items.length === 0 ? (
             <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
-              No items yet. Add products first.
+              No items yet. Add inventories first.
             </p>
           ) : (
             items.map((item) => (

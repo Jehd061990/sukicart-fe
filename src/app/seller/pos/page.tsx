@@ -18,6 +18,8 @@ import {
   POS_SELLER_SWITCH_FLAG_VALUE,
 } from "@/constants/pos-switch";
 import { useAuthStore } from "@/store/auth.store";
+import { CreatePOSModal } from "@/components/pos/CreatePOSModal";
+import { EditPOSModal } from "@/components/pos/EditPOSModal";
 
 const getStableDeviceId = () => {
   if (typeof window === "undefined") {
@@ -90,15 +92,17 @@ export default function SellerPOSPage() {
   const [assignedUserId, setAssignedUserId] = useState("");
   const [deviceStatus, setDeviceStatus] = useState<"active" | "inactive" | "suspended">("active");
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
-
-  const [editingPosId, setEditingPosId] = useState<string | null>(null);
-  const [editPosName, setEditPosName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editUsername, setEditUsername] = useState("");
-  const [editPassword, setEditPassword] = useState("");
-  const [editBranchId, setEditBranchId] = useState("");
-  const [editAssignedUserId, setEditAssignedUserId] = useState("");
-  const [editDeviceStatus, setEditDeviceStatus] = useState<"active" | "inactive" | "suspended">("active");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingPos, setEditingPos] = useState<{
+    id: string;
+    posName: string;
+    email?: string;
+    username: string;
+    branchId?: string | null;
+    assignedUserId?: string | null;
+    deviceStatus?: "active" | "inactive" | "suspended";
+  } | null>(null);
 
   const branchesQuery = useQuery({
     queryKey: ["seller-branches"],
@@ -136,34 +140,7 @@ export default function SellerPOSPage() {
     },
   });
 
-  const updatePOSMutation = useMutation({
-    mutationFn: (payload: {
-      id: string;
-      posName?: string;
-      email?: string;
-      username?: string;
-      password?: string;
-      branchId?: string;
-      assignedUserId?: string;
-      deviceStatus?: "active" | "inactive" | "suspended";
-    }) => posService.updatePOSAccount(payload.id, payload),
-    onSuccess: (data) => {
-      toast.success(data.message || "POS account updated");
-      setEditingPosId(null);
-      setEditPosName("");
-      setEditEmail("");
-      setEditUsername("");
-      setEditPassword("");
-      setEditBranchId("");
-      setEditAssignedUserId("");
-      setEditDeviceStatus("active");
-      queryClient.invalidateQueries({ queryKey: ["seller-pos-list"] });
-      queryClient.invalidateQueries({ queryKey: ["seller-pos-sessions"] });
-    },
-    onError: (error: unknown) => {
-      toast.error(asErrorMessage(error, "Failed to update POS account"));
-    },
-  });
+  // Edit POS logic is now handled in EditPOSModal
 
   const deactivatePOSMutation = useMutation({
     mutationFn: posService.deactivatePOSAccount,
@@ -254,43 +231,7 @@ export default function SellerPOSPage() {
     });
   };
 
-  const startEditPOS = (pos: {
-    id: string;
-    posName: string;
-    email?: string;
-    username: string;
-    branchId?: string | null;
-    assignedUserId?: string | null;
-    deviceStatus?: "active" | "inactive" | "suspended";
-  }) => {
-    setEditingPosId(pos.id);
-    setEditPosName(pos.posName);
-    setEditEmail(pos.email || "");
-    setEditUsername(pos.username);
-    setEditPassword("");
-    setEditBranchId(pos.branchId || "");
-    setEditAssignedUserId(pos.assignedUserId || "");
-    setEditDeviceStatus(pos.deviceStatus || "active");
-  };
-
-  const submitEditPOS = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!editingPosId) {
-      return;
-    }
-
-    updatePOSMutation.mutate({
-      id: editingPosId,
-      posName: editPosName.trim() || undefined,
-      email: editEmail.trim() || undefined,
-      username: editUsername.trim() || undefined,
-      password: editPassword.trim() || undefined,
-      branchId: editBranchId || undefined,
-      assignedUserId: editAssignedUserId.trim() || undefined,
-      deviceStatus: editDeviceStatus,
-    });
-  };
+  // Edit POS logic is now handled in EditPOSModal
 
   const launchSelectedPOS = (pos: { id: string; posName: string }) => {
     const authState = useAuthStore.getState();
@@ -329,6 +270,12 @@ export default function SellerPOSPage() {
       </section>
 
       <section>
+        <div className="flex justify-end mb-2">
+          <Button onClick={() => setCreateModalOpen(true)} variant="default">
+            + Add POS Device
+          </Button>
+        </div>
+        <CreatePOSModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />
         <Card>
           <CardHeader>
             <CardTitle>POS Device Management</CardTitle>
@@ -337,71 +284,6 @@ export default function SellerPOSPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <form className="grid gap-3 md:grid-cols-7" onSubmit={onCreatePOS}>
-              <Input
-                value={posName}
-                onChange={(event) => setPosName(event.target.value)}
-                placeholder="POS Device Name"
-              />
-              <Input
-                value={posEmail}
-                onChange={(event) => setPosEmail(event.target.value)}
-                placeholder="Email (optional)"
-                type="email"
-              />
-              <Input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Username"
-              />
-              <Input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Password (optional)"
-                type="password"
-              />
-              <select
-                value={posBranchId}
-                onChange={(event) => setPosBranchId(event.target.value)}
-                className="h-8 rounded-lg border bg-background px-2.5 text-sm"
-              >
-                <option value="">Auto branch</option>
-                {(branchesQuery.data?.branches || []).map((branch) => (
-                  <option key={branch._id} value={branch._id}>
-                    {branch.branchName}
-                  </option>
-                ))}
-              </select>
-              <Input
-                value={assignedUserId}
-                onChange={(event) => setAssignedUserId(event.target.value)}
-                placeholder="Assigned Cashier/User ID"
-              />
-              <select
-                value={deviceStatus}
-                onChange={(event) =>
-                  setDeviceStatus(event.target.value as "active" | "inactive" | "suspended")
-                }
-                className="h-8 rounded-lg border bg-background px-2.5 text-sm"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
-              </select>
-
-              <div className="md:col-span-6">
-                <Button type="submit" disabled={createPOSMutation.isPending}>
-                  {createPOSMutation.isPending ? "Creating..." : "Create POS Device"}
-                </Button>
-              </div>
-            </form>
-
-            {generatedPassword ? (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-mono text-sm text-emerald-900">
-                Generated password: {generatedPassword}
-              </p>
-            ) : null}
-
             <div className="overflow-x-auto">
               <table className="min-w-full border-collapse text-sm">
                 <thead>
@@ -449,9 +331,8 @@ export default function SellerPOSPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={updatePOSMutation.isPending}
-                            onClick={() =>
-                              startEditPOS({
+                            onClick={() => {
+                              setEditingPos({
                                 id: pos.id,
                                 posName: pos.posName,
                                 email: pos.email,
@@ -459,8 +340,9 @@ export default function SellerPOSPage() {
                                 branchId: pos.branchId,
                                 assignedUserId: pos.assignedUserId,
                                 deviceStatus: pos.deviceStatus,
-                              })
-                            }
+                              });
+                              setEditModalOpen(true);
+                            }}
                           >
                             Edit
                           </Button>
@@ -479,70 +361,6 @@ export default function SellerPOSPage() {
                 </tbody>
               </table>
             </div>
-
-            {editingPosId ? (
-              <form className="grid gap-3 rounded-xl border p-4 md:grid-cols-7" onSubmit={submitEditPOS}>
-                <Input
-                  value={editPosName}
-                  onChange={(event) => setEditPosName(event.target.value)}
-                  placeholder="POS Device Name"
-                />
-                <Input
-                  value={editEmail}
-                  onChange={(event) => setEditEmail(event.target.value)}
-                  placeholder="Email (optional)"
-                  type="email"
-                />
-                <Input
-                  value={editUsername}
-                  onChange={(event) => setEditUsername(event.target.value)}
-                  placeholder="Username"
-                />
-                <Input
-                  value={editPassword}
-                  onChange={(event) => setEditPassword(event.target.value)}
-                  placeholder="New Password"
-                  type="password"
-                />
-                <select
-                  value={editBranchId}
-                  onChange={(event) => setEditBranchId(event.target.value)}
-                  className="h-8 rounded-lg border bg-background px-2.5 text-sm"
-                >
-                  <option value="">Auto branch</option>
-                  {(branchesQuery.data?.branches || []).map((branch) => (
-                    <option key={branch._id} value={branch._id}>
-                      {branch.branchName}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  value={editAssignedUserId}
-                  onChange={(event) => setEditAssignedUserId(event.target.value)}
-                  placeholder="Assigned Cashier/User ID"
-                />
-                <select
-                  value={editDeviceStatus}
-                  onChange={(event) =>
-                    setEditDeviceStatus(event.target.value as "active" | "inactive" | "suspended")
-                  }
-                  className="h-8 rounded-lg border bg-background px-2.5 text-sm"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
-                </select>
-
-                <div className="flex gap-2 md:col-span-6">
-                  <Button type="submit" disabled={updatePOSMutation.isPending}>
-                    {updatePOSMutation.isPending ? "Saving..." : "Save Changes"}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setEditingPosId(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            ) : null}
 
             <div className="space-y-2">
               <p className="text-sm font-semibold text-slate-900">Active Sessions</p>
@@ -572,7 +390,14 @@ export default function SellerPOSPage() {
             </div>
           </CardContent>
         </Card>
+        <EditPOSModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          pos={editingPos}
+          branches={branchesQuery.data?.branches || []}
+        />
       </section>
     </div>
   );
+// Removed obsolete/duplicate form and session rendering code after main return block
 }

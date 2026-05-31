@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -766,9 +767,12 @@ function POSPageContent() {
 
       try {
         const result = await posService.createOrder(payload);
+        const publicOrderId =
+          String(result.order.transactionNumber || result.order.id || "").trim() ||
+          `SUKI-${Date.now()}`;
         return {
           queuedOffline: false,
-          orderId: result.order._id,
+          orderId: publicOrderId,
           itemSnapshot,
         };
       } catch (error) {
@@ -803,6 +807,9 @@ function POSPageContent() {
       clearCart();
       setDiscountAmount(0);
       setCheckoutOpen(false);
+
+      // Show success toast with total amount
+      toast.success(`Order successful! Total: PHP ${total.toFixed(2)}`);
 
       if (result.queuedOffline) {
         setScannerStatus("Offline: order queued for sync");

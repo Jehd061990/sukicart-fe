@@ -52,7 +52,7 @@ The dashboard is plan-aware and combines subscription features, live seller data
 
 2. Plan-aware Intro + Quick Actions
 - dashboard title and plan-aware summary
-- quick shortcut actions (Create Product, Open POS, Review Billing, Run Report, Automate Flow, Open Alerts)
+- quick shortcut actions (Create Inventory, Open POS, Review Billing, Run Report, Automate Flow, Open Alerts)
 
 3. KPI Widget Grid
 - shows metric cards based on plan
@@ -257,6 +257,36 @@ Tenant-level operational behavior control without hardcoding per seller.
 - store type selection
 - max line items
 - preferred POS device mode
+
+## 9) POS Adaptive Mode, Printing, and Offline (Quick Guide)
+
+Route: `/pos`
+
+### Device-Adaptive Layout
+
+- POS auto-adjusts layout based on runtime device profile (desktop, tablet, mobile, Android, iOS).
+- Desktop/tablet keeps cart on the right side.
+- Compact/mobile mode uses bottom cart controls for faster one-hand operation.
+- First-time mode onboarding lets cashier choose preferred mode and saves it locally.
+
+### Printer Routing and Fallbacks
+
+- Android POS prioritizes Bluetooth printer adapter.
+- iOS uses AirPrint/browser print flow.
+- Desktop prioritizes local bridge, then browser print fallback.
+- Printer selection and connection state are handled through the POS printer module.
+
+### Print Queue and Retry
+
+- If receipt print fails, the receipt is queued.
+- Queue entries can be retried one-by-one or all-at-once.
+- Queue entries can also be saved as PDF when printer recovery is delayed.
+
+### Offline Checkout Behavior
+
+- If network is unavailable during checkout, POS order payload is queued for sync.
+- Receipt history is still recorded locally and can be printed or retried later.
+- When internet returns, pending sync queue resumes automatically.
 
 2. Feature Flags
 - barcode scanning

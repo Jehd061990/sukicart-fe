@@ -24,11 +24,25 @@ export interface CreatePOSOrderPayload {
 export interface POSOrderResponse {
   message: string;
   order: {
-    _id: string;
+    id: string;
+    transactionNumber: string;
     total: number;
     totalAmount?: number;
     status: string;
     type: "POS" | "ONLINE";
+    branchId?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    items?: Array<{
+      productId: string;
+      name: string;
+      unit: "kg" | "pcs";
+      price: number;
+      quantity: number;
+      lineTotal: number;
+      variant?: string;
+      note?: string;
+    }>;
     taxSummary?: {
       businessTaxType: "VAT" | "NON_VAT";
       taxEnabled: boolean;

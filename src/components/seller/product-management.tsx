@@ -22,6 +22,7 @@ import {
 } from "@/types/product";
 import { LazyInventoryImage } from "@/components/images/lazy-inventory-image";
 import { SukiGoImageUploader } from "@/components/uploads/sukigo-image-uploader";
+import { toast } from "sonner";
 
 const CATEGORY_OPTIONS: ProductCategory[] = ["vegetables", "meat", "fish"];
 const UNIT_OPTIONS: ProductUnit[] = ["kg", "pcs"];
@@ -64,6 +65,8 @@ export function ProductManagement() {
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
+  const [stockToAdd, setStockToAdd] = useState("1");
   const [formValues, setFormValues] =
     useState<CreateProductPayload>(INITIAL_FORM);
 
@@ -149,6 +152,31 @@ export function ProductManagement() {
     },
   });
 
+  const addStockMutation = useMutation({
+    mutationFn: ({ product, quantity }: { product: Product; quantity: number }) =>
+      productService.update(product._id, {
+        stock: Number(product.stock || 0) + quantity,
+      }),
+    onSuccess: (_result, variables) => {
+      setDetailsProduct((previous) => {
+        if (!previous || previous._id !== variables.product._id) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          stock: Number(previous.stock || 0) + variables.quantity,
+        };
+      });
+      setStockToAdd("1");
+      queryClient.invalidateQueries({ queryKey: ["seller-products"] });
+      toast.success("Stock added successfully.");
+    },
+    onError: () => {
+      toast.error("Failed to add stock.");
+    },
+  });
+
   const products = productsQuery.data?.products || [];
   const pagination = productsQuery.data?.pagination;
 
@@ -180,6 +208,28 @@ export function ProductManagement() {
       taxRate: Number(product.taxRate || 0),
     });
     setIsModalOpen(true);
+  };
+
+  const openDetailsModal = (product: Product) => {
+    setDetailsProduct(product);
+    setStockToAdd("1");
+  };
+
+  const handleAddStocks = async () => {
+    if (!detailsProduct) {
+      return;
+    }
+
+    const quantity = Math.floor(Number(stockToAdd));
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      toast.error("Enter a valid stock quantity greater than 0.");
+      return;
+    }
+
+    await addStockMutation.mutateAsync({
+      product: detailsProduct,
+      quantity,
+    });
   };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -262,14 +312,20 @@ export function ProductManagement() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => openEditModal(row.original)}
+              onClick={(event) => {
+                event.stopPropagation();
+                openEditModal(row.original);
+              }}
               className="rounded border px-2 py-1 text-xs font-semibold hover:bg-muted"
             >
               Edit
             </button>
             <button
               type="button"
-              onClick={() => deleteMutation.mutate(row.original._id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                deleteMutation.mutate(row.original._id);
+              }}
               className="rounded border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
             >
               Delete
@@ -292,13 +348,13 @@ export function ProductManagement() {
     <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Product Management</h1>
+          <h1 className="text-2xl font-semibold">Inventory Management</h1>
           <p className="text-sm text-muted-foreground">
-            Manage your catalog with create, edit, and delete actions.
+            Manage your inventory catalog with create, edit, and delete actions.
           </p>
         </div>
 
-        <Button onClick={openAddModal}>Add Product</Button>
+        <Button onClick={openAddModal}>Add Inventory</Button>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -360,7 +416,11 @@ export function ProductManagement() {
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b last:border-0">
+                <tr
+                  key={row.id}
+                  className="cursor-pointer border-b last:border-0 hover:bg-muted/40"
+                  onClick={() => openDetailsModal(row.original)}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-3 py-2 align-top">
                       {flexRender(
@@ -397,13 +457,13 @@ export function ProductManagement() {
       </div>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-background p-5 shadow-xl overflow-x-auto">
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg max-h-[90vh] rounded-2xl bg-background p-5 shadow-xl overflow-y-auto scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-slate-300 scrollbar-track-transparent">
             <h2 className="text-lg font-semibold">
-              {editingProduct ? "Edit Product" : "Add Product"}
+              {editingProduct ? "Edit Inventory" : "Add Inventory"}
             </h2>
 
-            <form className="mt-4 space-y-3 min-h-[600px]" onSubmit={onSubmit}>
+            <form className="mt-4 space-y-3 min-h-150" onSubmit={onSubmit}>
               <Input
                 required
                 placeholder="Product name"
@@ -621,10 +681,90 @@ export function ProductManagement() {
                     createMutation.isPending || updateMutation.isPending
                   }
                 >
-                  {editingProduct ? "Save Changes" : "Create Product"}
+                  {editingProduct ? "Save Changes" : "Create Inventory"}
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {detailsProduct ? (
+        <div className="fixed inset-0 z-90 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-background p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Item Details</h2>
+                <p className="text-xs text-muted-foreground">Review item info and add stocks.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailsProduct(null)}
+                className="rounded border px-2 py-1 text-xs font-semibold hover:bg-muted"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-[72px_1fr] gap-3">
+              <LazyInventoryImage
+                name={detailsProduct.name}
+                image={detailsProduct.image}
+                images={detailsProduct.images}
+                size={72}
+              />
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-foreground">{detailsProduct.name}</p>
+                <p className="text-muted-foreground">Price: PHP {Number(detailsProduct.price || 0).toFixed(2)}</p>
+                <p className="text-muted-foreground">Category: {detailsProduct.category}</p>
+                <p className="text-muted-foreground">Unit: {detailsProduct.unit}</p>
+                <p className="text-muted-foreground">Barcode: {detailsProduct.barcode || "-"}</p>
+                <p className="text-muted-foreground">Status: {detailsProduct.status}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-semibold">Current Stock: {detailsProduct.stock}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  step="1"
+                  value={stockToAdd}
+                  onChange={(event) => setStockToAdd(event.target.value)}
+                  placeholder="Add quantity"
+                />
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void handleAddStocks();
+                  }}
+                  disabled={addStockMutation.isPending}
+                >
+                  {addStockMutation.isPending ? "Adding..." : "Add Stocks"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDetailsProduct(null);
+                }}
+              >
+                Done
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  openEditModal(detailsProduct);
+                }}
+              >
+                Edit Item
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}
