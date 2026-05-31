@@ -240,6 +240,30 @@
   }
 }
 
+@keyframes sellerMenuJump {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-2px);
+  }
+  70% {
+    transform: translateY(0);
+  }
+}
+
+.seller-menu-jump {
+  animation: sellerMenuJump 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seller-menu-jump {
+    animation: none;
+  }
+}
+
 /* Global SimpleBar styling to match SukiGo theme across all scroll containers. */
 .simplebar-track.simplebar-vertical {
   width: 8px;
@@ -261,23 +285,42 @@
   inset: 1px;
 }
 
-.simplebar-track .simplebar-scrollbar.simplebar-visible::before {
-  opacity: 0.95;
-}
-
+.simplebar-scrolling .simplebar-scrollbar::before,
 .simplebar-hover .simplebar-scrollbar::before,
 .simplebar-dragging .simplebar-scrollbar::before {
   background-color: color-mix(in oklab, var(--brand) 84%, transparent);
-  opacity: 1;
+  opacity: 0.95;
 }
 
 .simplebar-track.simplebar-vertical,
 .simplebar-track.simplebar-horizontal {
-  background: color-mix(in oklab, var(--muted) 78%, transparent);
+  background: transparent;
   border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
 }
 
 .dark .simplebar-track.simplebar-vertical,
 .dark .simplebar-track.simplebar-horizontal {
+  background: transparent;
+  /* background: color-mix(in oklab, var(--muted) 78%, transparent); */
+}
+
+.simplebar:hover .simplebar-track.simplebar-vertical,
+.simplebar:hover .simplebar-track.simplebar-horizontal,
+.simplebar-scrolling .simplebar-track.simplebar-vertical,
+.simplebar-scrolling .simplebar-track.simplebar-horizontal,
+.simplebar-dragging .simplebar-track.simplebar-vertical,
+.simplebar-dragging .simplebar-track.simplebar-horizontal {
+  opacity: 1;
+  background: color-mix(in oklab, var(--muted) 78%, transparent);
+}
+
+.dark .simplebar:hover .simplebar-track.simplebar-vertical,
+.dark .simplebar:hover .simplebar-track.simplebar-horizontal,
+.dark .simplebar-scrolling .simplebar-track.simplebar-vertical,
+.dark .simplebar-scrolling .simplebar-track.simplebar-horizontal,
+.dark .simplebar-dragging .simplebar-track.simplebar-vertical,
+.dark .simplebar-dragging .simplebar-track.simplebar-horizontal {
   background: color-mix(in oklab, var(--muted) 55%, transparent);
 }
