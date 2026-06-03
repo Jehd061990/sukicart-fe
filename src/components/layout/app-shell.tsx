@@ -104,7 +104,7 @@ export function AppShell({ children }: PropsWithChildren) {
             isPOSRoute
               ? "overflow-hidden p-0"
               : useNativeMobileScroll
-                ? "overflow-y-auto p-3 pt-8 md:overflow-hidden md:p-6"
+                ? "overflow-y-auto p-3 pt-8 md:overflow-y-auto md:p-6"
                 : "overflow-hidden p-3 md:p-6"
           }`}
         >

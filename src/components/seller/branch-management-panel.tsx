@@ -45,6 +45,7 @@ const asErrorMessage = (error: unknown, fallback: string) => {
 
 export function BranchManagementPanel() {
   const queryClient = useQueryClient();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [branchName, setBranchName] = useState("");
   const [branchAddress, setBranchAddress] = useState("");
   const [branchContactNumber, setBranchContactNumber] = useState("");
@@ -61,6 +62,7 @@ export function BranchManagementPanel() {
       setBranchName("");
       setBranchAddress("");
       setBranchContactNumber("");
+      setIsCreateModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["seller-branches"] });
       queryClient.invalidateQueries({ queryKey: ["seller-subscription-current"] });
     },
@@ -109,6 +111,14 @@ export function BranchManagementPanel() {
     });
   };
 
+  const onCloseCreateModal = () => {
+    if (createBranchMutation.isPending) {
+      return;
+    }
+
+    setIsCreateModalOpen(false);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -118,26 +128,11 @@ export function BranchManagementPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form className="grid gap-3" onSubmit={onCreateBranch}>
-          <Input
-            value={branchName}
-            onChange={(event) => setBranchName(event.target.value)}
-            placeholder="Branch Name"
-          />
-          <Input
-            value={branchAddress}
-            onChange={(event) => setBranchAddress(event.target.value)}
-            placeholder="Address"
-          />
-          <Input
-            value={branchContactNumber}
-            onChange={(event) => setBranchContactNumber(event.target.value)}
-            placeholder="Contact Number"
-          />
-          <Button type="submit" disabled={createBranchMutation.isPending}>
-            {createBranchMutation.isPending ? "Creating..." : "Create Branch"}
+        <div className="mb-4 flex justify-end">
+          <Button type="button" onClick={() => setIsCreateModalOpen(true)}>
+            Create Branch
           </Button>
-        </form>
+        </div>
 
         <div className="mt-4 space-y-2">
           {branchesQuery.isLoading ? (
@@ -196,9 +191,50 @@ export function BranchManagementPanel() {
           ))}
 
           {!branchesQuery.isLoading && (branchesQuery.data?.branches || []).length === 0 ? (
-            <p className="rounded-xl border p-3 text-sm text-muted-foreground">No branches yet. Create your first branch above.</p>
+            <p className="rounded-xl border p-3 text-sm text-muted-foreground">No branches yet. Create your first branch.</p>
           ) : null}
         </div>
+
+        {isCreateModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+              <CardHeader className="px-0 pt-0">
+                <CardTitle>Create Branch</CardTitle>
+                <CardDescription>
+                  Add a new branch for seller operations and POS assignment.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="px-0 pb-0">
+                <form className="grid gap-3" onSubmit={onCreateBranch}>
+                  <Input
+                    value={branchName}
+                    onChange={(event) => setBranchName(event.target.value)}
+                    placeholder="Branch Name"
+                  />
+                  <Input
+                    value={branchAddress}
+                    onChange={(event) => setBranchAddress(event.target.value)}
+                    placeholder="Address"
+                  />
+                  <Input
+                    value={branchContactNumber}
+                    onChange={(event) => setBranchContactNumber(event.target.value)}
+                    placeholder="Contact Number"
+                  />
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button type="button" variant="outline" onClick={onCloseCreateModal}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createBranchMutation.isPending}>
+                      {createBranchMutation.isPending ? "Creating..." : "Create Branch"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

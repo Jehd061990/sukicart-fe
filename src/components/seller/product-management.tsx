@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { VirtualizedSimpleBarList } from "@/components/ui/virtualized-simplebar-list";
 import { posService } from "@/lib/api/services/pos.service";
 import { productService } from "@/lib/api/services/product.service";
 import {
@@ -344,6 +345,14 @@ export function ProductManagement() {
     getCoreRowModel: getCoreRowModel(),
   });
 
+  const inventoryRows = table.getRowModel().rows;
+  const headerGroups = table.getHeaderGroups();
+  const columnCount = table.getVisibleLeafColumns().length;
+  const columnTemplate = `repeat(${columnCount}, minmax(100px, 1fr))`;
+  // const INVENTORY_LIST_HEIGHT = "clamp(calc(100dvh - 150px), 56vh, 560px)";
+  const INVENTORY_LIST_HEIGHT = "calc(100dvh - 400px)";
+  const INVENTORY_ROW_ESTIMATE_SIZE_PX = 84;
+
   return (
     <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -384,56 +393,60 @@ export function ProductManagement() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-full text-sm">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b text-left">
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-3 py-2 font-semibold">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {productsQuery.isLoading ? (
-              <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={10}>
-                  Loading products...
-                </td>
-              </tr>
-            ) : table.getRowModel().rows.length === 0 ? (
-              <tr>
-                <td className="px-3 py-4 text-muted-foreground" colSpan={10}>
-                  No products found.
-                </td>
-              </tr>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="cursor-pointer border-b last:border-0 hover:bg-muted/40"
+        <div style={{ minWidth: 1200 }}>
+          {headerGroups.map((headerGroup) => (
+            <div
+              key={headerGroup.id}
+              className="grid border-b text-left text-sm"
+              style={{ gridTemplateColumns: columnTemplate }}
+            >
+              {headerGroup.headers.map((header) => (
+                <div key={header.id} className="px-3 py-2 font-semibold">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {productsQuery.isLoading ? (
+            <div className="px-3 py-4 text-sm text-muted-foreground" style={{ height: INVENTORY_LIST_HEIGHT }}>
+              Loading products...
+            </div>
+          ) : inventoryRows.length === 0 ? (
+            <div className="px-3 py-4 text-sm text-muted-foreground" style={{ height: INVENTORY_LIST_HEIGHT }}>
+              No products found.
+            </div>
+          ) : (
+            <VirtualizedSimpleBarList
+              items={inventoryRows}
+              height={INVENTORY_LIST_HEIGHT}
+              estimateSize={INVENTORY_ROW_ESTIMATE_SIZE_PX}
+              overscan={10}
+              contentClassName="relative"
+              itemClassName="absolute left-0 top-0 w-full"
+              hideHorizontalOverflow
+              getItemKey={(row) => row.id}
+              renderItem={(row) => (
+                <div
+                  className="grid cursor-pointer border-b bg-card text-sm last:border-0 hover:bg-muted/40"
+                  style={{ gridTemplateColumns: columnTemplate }}
                   onClick={() => openDetailsModal(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3 py-2 align-top">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </td>
+                    <div key={cell.id} className="px-3 py-2 align-top">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
                   ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                </div>
+              )}
+            />
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-end gap-2">

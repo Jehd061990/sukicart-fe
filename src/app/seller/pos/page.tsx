@@ -95,6 +95,9 @@ export default function SellerPOSPage() {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"devices" | "sessions">(
+    "devices",
+  );
   const [editingPos, setEditingPos] = useState<{
     id: string;
     posName: string;
@@ -256,12 +259,14 @@ export default function SellerPOSPage() {
     launchPOSMutation.mutate({ id: pos.id, posName: pos.posName });
   };
 
-  const ORDER_LIST_HEIGHT_PX = 460;
+//   const ORDER_LIST_HEIGHT_PX = "clamp(260px, 42vh, 420px)";
+const ORDER_LIST_HEIGHT_PX = "calc(100dvh - 190px)";
   const ORDER_CARD_ESTIMATE_SIZE_PX = 96;
   const ORDER_CARD_GAP_PX = 12;
-  const POS_MOBILE_LIST_HEIGHT = "clamp(320px, 60vh, 560px)";
+//   const POS_MOBILE_LIST_HEIGHT = "clamp(320px, 60vh, 560px)";
+const POS_MOBILE_LIST_HEIGHT = "calc(100dvh - 290px)";
   const POS_MOBILE_CARD_ESTIMATE_SIZE_PX = 232;
-  const POS_TABLE_HEIGHT = "clamp(280px, 58vh, 520px)";
+  const POS_TABLE_HEIGHT = "clamp(260px, 42vh, 420px)";
   const POS_ROW_ESTIMATE_SIZE_PX = 96;
 
   return (
@@ -277,190 +282,116 @@ export default function SellerPOSPage() {
       </section> */}
 
       <section>
-        <div className="flex justify-end mb-2">
-          {/* <p className="mt-2 font-sans text-sm text-gray-700">{usageLabel}</p> */}
-          <Button onClick={() => setCreateModalOpen(true)} variant="default">
-            + Add POS Device
-          </Button>
-        </div>
+        
+          <div className="inline-flex rounded-lg border bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => setActiveView("devices")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                activeView === "devices"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              POS Management
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView("sessions")}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                activeView === "sessions"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Active Sessions
+            </button>
+          </div>
+        {/* </div> */}
+
         <CreatePOSModal
           open={createModalOpen}
           onClose={() => setCreateModalOpen(false)}
         />
-        <Card>
-          <CardHeader>
-            <CardTitle>POS Device Management</CardTitle>
-            <CardDescription>
-              Register devices, assign branch and cashier, manage status, and
-              control active sessions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <p className="mt-2 font-sans text-sm text-primary-700">{usageLabel}</p>
-            <div className="md:hidden">
-              <VirtualizedSimpleBarList
-                items={posListQuery.data?.data || []}
-                height={POS_MOBILE_LIST_HEIGHT}
-                estimateSize={POS_MOBILE_CARD_ESTIMATE_SIZE_PX}
-                gap={12}
-                overscan={6}
-                getItemKey={(pos) => pos.id}
-                renderItem={(pos) => (
-                  <div className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="space-y-1">
-                      <p
-                        className="truncate text-base font-semibold text-slate-900"
-                        title={pos.posName}
-                      >
-                        {pos.posName}
-                      </p>
-                      <p
-                        className="truncate text-xs text-slate-600"
-                        title={pos.email || "-"}
-                      >
-                        {pos.email || "-"}
-                      </p>
-                    </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-slate-700">
-                      <p className="truncate" title={pos.username}>
-                        <span className="font-semibold">Username:</span>{" "}
-                        {pos.username}
-                      </p>
-                      <p
-                        className="truncate"
-                        title={pos.branchName || "Main Branch"}
-                      >
-                        <span className="font-semibold">Branch:</span>{" "}
-                        {pos.branchName || "Main Branch"}
-                      </p>
-                      <p className="truncate" title={pos.assignedUserId || "-"}>
-                        <span className="font-semibold">Assigned:</span>{" "}
-                        {pos.assignedUserId || "-"}
-                      </p>
-                      <p
-                        className="truncate"
-                        title={pos.activeSession?.deviceName || "-"}
-                      >
-                        <span className="font-semibold">Session:</span>{" "}
-                        {pos.activeSession?.deviceName || "-"}
-                      </p>
-                    </div>
-
-                    <div className="mt-3">
-                      <Badge
-                        variant={statusVariant(pos.deviceStatus || pos.status)}
-                      >
-                        {pos.isDeactivated
-                          ? "deactivated"
-                          : pos.deviceStatus || pos.status}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={
-                          launchPOSMutation.isPending ||
-                          pos.isDeactivated ||
-                          (pos.deviceStatus || "active") !== "active"
-                        }
-                        onClick={() =>
-                          launchSelectedPOS({
-                            id: pos.id,
-                            posName: pos.posName,
-                          })
-                        }
-                      >
-                        {launchPOSMutation.isPending &&
-                        launchPOSMutation.variables?.id === pos.id
-                          ? "Opening..."
-                          : "Open POS"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingPos({
-                            id: pos.id,
-                            posName: pos.posName,
-                            email: pos.email,
-                            username: pos.username,
-                            branchId: pos.branchId,
-                            assignedUserId: pos.assignedUserId,
-                            deviceStatus: pos.deviceStatus,
-                          });
-                          setEditModalOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={
-                          deactivatePOSMutation.isPending || pos.isDeactivated
-                        }
-                        onClick={() => deactivatePOSMutation.mutate(pos.id)}
-                      >
-                        Deactivate
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              />
-            </div>
-
-            <div className="hidden overflow-x-auto md:block">
-              <div className="min-w-372">
-                <div className="grid grid-cols-[11rem_14rem_10rem_9rem_10rem_9rem_14rem_16rem] border-b text-left text-sm font-medium text-slate-700">
-                  <div className="px-2 py-2">Device</div>
-                  <div className="px-2 py-2">Email</div>
-                  <div className="px-2 py-2">Username</div>
-                  <div className="px-2 py-2">Branch</div>
-                  <div className="px-2 py-2">Assigned User</div>
-                  <div className="px-2 py-2">Device Status</div>
-                  <div className="px-2 py-2">Session Device</div>
-                  <div className="px-2 py-2">Actions</div>
+        {activeView === "devices" ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>POS Device Management</CardTitle>
+              <CardDescription>
+                Register devices, assign branch and cashier, manage status, and
+                control active sessions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="mt-2 font-sans text-sm text-primary-700">
+                {usageLabel}
+              </p>
+              <Button
+                onClick={() => setCreateModalOpen(true)}
+                variant="default"
+                className="shrink-0"
+              >
+                + Add POS Device
+              </Button>
                 </div>
+              
 
+              <div className="md:hidden">
                 <VirtualizedSimpleBarList
                   items={posListQuery.data?.data || []}
-                  height={POS_TABLE_HEIGHT}
-                  estimateSize={POS_ROW_ESTIMATE_SIZE_PX}
-                  overscan={8}
-                  contentClassName="relative"
-                  itemClassName="absolute left-0 top-0 w-full"
-                  hideHorizontalOverflow
+                  height={POS_MOBILE_LIST_HEIGHT}
+                  estimateSize={POS_MOBILE_CARD_ESTIMATE_SIZE_PX}
+                  gap={12}
+                  overscan={6}
                   getItemKey={(pos) => pos.id}
                   renderItem={(pos) => (
-                    <div className="grid min-h-20 grid-cols-[11rem_14rem_10rem_9rem_10rem_9rem_14rem_16rem] items-center border-b bg-white text-sm">
-                      <div className="truncate px-2 py-2" title={pos.posName}>
-                        {pos.posName}
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="space-y-1">
+                        <p
+                          className="truncate text-base font-semibold text-slate-900"
+                          title={pos.posName}
+                        >
+                          {pos.posName}
+                        </p>
+                        <p
+                          className="truncate text-xs text-slate-600"
+                          title={pos.email || "-"}
+                        >
+                          {pos.email || "-"}
+                        </p>
                       </div>
-                      <div
-                        className="truncate px-2 py-2"
-                        title={pos.email || "-"}
-                      >
-                        {pos.email || "-"}
+
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-slate-700">
+                        <p className="truncate" title={pos.username}>
+                          <span className="font-semibold">Username:</span>{" "}
+                          {pos.username}
+                        </p>
+                        <p
+                          className="truncate"
+                          title={pos.branchName || "Main Branch"}
+                        >
+                          <span className="font-semibold">Branch:</span>{" "}
+                          {pos.branchName || "Main Branch"}
+                        </p>
+                        <p
+                          className="truncate"
+                          title={pos.assignedUserId || "-"}
+                        >
+                          <span className="font-semibold">Assigned:</span>{" "}
+                          {pos.assignedUserId || "-"}
+                        </p>
+                        <p
+                          className="truncate"
+                          title={pos.activeSession?.deviceName || "-"}
+                        >
+                          <span className="font-semibold">Session:</span>{" "}
+                          {pos.activeSession?.deviceName || "-"}
+                        </p>
                       </div>
-                      <div className="truncate px-2 py-2" title={pos.username}>
-                        {pos.username}
-                      </div>
-                      <div
-                        className="truncate px-2 py-2"
-                        title={pos.branchName || "Main Branch"}
-                      >
-                        {pos.branchName || "Main Branch"}
-                      </div>
-                      <div
-                        className="truncate px-2 py-2"
-                        title={pos.assignedUserId || "-"}
-                      >
-                        {pos.assignedUserId || "-"}
-                      </div>
-                      <div className="px-2 py-2">
+
+                      <div className="mt-3">
                         <Badge
                           variant={statusVariant(
                             pos.deviceStatus || pos.status,
@@ -471,130 +402,204 @@ export default function SellerPOSPage() {
                             : pos.deviceStatus || pos.status}
                         </Badge>
                       </div>
-                      <div
-                        className="truncate px-2 py-2"
-                        title={pos.activeSession?.deviceName || "-"}
-                      >
-                        {pos.activeSession?.deviceName || "-"}
-                      </div>
-                      <div className="px-2 py-2">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              launchPOSMutation.isPending ||
-                              pos.isDeactivated ||
-                              (pos.deviceStatus || "active") !== "active"
-                            }
-                            onClick={() =>
-                              launchSelectedPOS({
-                                id: pos.id,
-                                posName: pos.posName,
-                              })
-                            }
-                          >
-                            {launchPOSMutation.isPending &&
-                            launchPOSMutation.variables?.id === pos.id
-                              ? "Opening..."
-                              : "Open POS"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingPos({
-                                id: pos.id,
-                                posName: pos.posName,
-                                email: pos.email,
-                                username: pos.username,
-                                branchId: pos.branchId,
-                                assignedUserId: pos.assignedUserId,
-                                deviceStatus: pos.deviceStatus,
-                              });
-                              setEditModalOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              deactivatePOSMutation.isPending ||
-                              pos.isDeactivated
-                            }
-                            onClick={() => deactivatePOSMutation.mutate(pos.id)}
-                          >
-                            Deactivate
-                          </Button>
-                        </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            launchPOSMutation.isPending ||
+                            pos.isDeactivated ||
+                            (pos.deviceStatus || "active") !== "active"
+                          }
+                          onClick={() =>
+                            launchSelectedPOS({
+                              id: pos.id,
+                              posName: pos.posName,
+                            })
+                          }
+                        >
+                          {launchPOSMutation.isPending &&
+                          launchPOSMutation.variables?.id === pos.id
+                            ? "Opening..."
+                            : "Open POS"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingPos({
+                              id: pos.id,
+                              posName: pos.posName,
+                              email: pos.email,
+                              username: pos.username,
+                              branchId: pos.branchId,
+                              assignedUserId: pos.assignedUserId,
+                              deviceStatus: pos.deviceStatus,
+                            });
+                            setEditModalOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            deactivatePOSMutation.isPending || pos.isDeactivated
+                          }
+                          onClick={() => deactivatePOSMutation.mutate(pos.id)}
+                        >
+                          Deactivate
+                        </Button>
                       </div>
                     </div>
                   )}
                 />
               </div>
-            </div>
 
-            {/* <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-900">
-                Active Sessions
-              </p>
-              <VirtualizedSimpleBarList
-                items={sessionListQuery.data?.data || []}
-                height={ORDER_LIST_HEIGHT_PX}
-                estimateSize={ORDER_CARD_ESTIMATE_SIZE_PX}
-                gap={ORDER_CARD_GAP_PX}
-                overscan={8}
-                // className="rounded-xl border border-slate-200 bg-slate-50/70"
-                getItemKey={(session) => session.id}
-                renderItem={(session) => (
-                  <div
-                    key={session.id}
-                    className="flex min-h-21 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">
-                        {session.role} -{" "}
-                        {session.deviceName || session.deviceId}
-                      </p>
-                      <p className="truncate text-xs text-gray-600">
-                        Last active: {toDate(session.lastActiveAt)} | IP:{" "}
-                        {session.ipAddress || "-"}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      disabled={forceLogoutMutation.isPending}
-                      onClick={() => forceLogoutMutation.mutate(session.id)}
-                    >
-                      Force Logout
-                    </Button>
+              <div className="hidden overflow-x-auto md:block">
+                <div className="min-w-372">
+                  <div className="grid grid-cols-[11rem_14rem_10rem_9rem_10rem_9rem_14rem_16rem] border-b text-left text-sm font-medium text-slate-700">
+                    <div className="px-2 py-2">Device</div>
+                    <div className="px-2 py-2">Email</div>
+                    <div className="px-2 py-2">Username</div>
+                    <div className="px-2 py-2">Branch</div>
+                    <div className="px-2 py-2">Assigned User</div>
+                    <div className="px-2 py-2">Device Status</div>
+                    <div className="px-2 py-2">Session Device</div>
+                    <div className="px-2 py-2">Actions</div>
                   </div>
-                )}
-              />
-            </div> */}
-          </CardContent>
-        </Card>
 
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>Active Sessions</CardTitle>
-            {/* <CardDescription>
-              Register devices, assign branch and cashier, manage status, and
-              control active sessions.
-            </CardDescription> */}
-            <CardContent className=" px-0">
-              {/* <div className="space-y-2"> */}
+                  <VirtualizedSimpleBarList
+                    items={posListQuery.data?.data || []}
+                    height={POS_TABLE_HEIGHT}
+                    estimateSize={POS_ROW_ESTIMATE_SIZE_PX}
+                    overscan={8}
+                    contentClassName="relative"
+                    itemClassName="absolute left-0 top-0 w-full"
+                    hideHorizontalOverflow
+                    getItemKey={(pos) => pos.id}
+                    renderItem={(pos) => (
+                      <div className="grid min-h-20 grid-cols-[11rem_14rem_10rem_9rem_10rem_9rem_14rem_16rem] items-center border-b bg-white text-sm">
+                        <div className="truncate px-2 py-2" title={pos.posName}>
+                          {pos.posName}
+                        </div>
+                        <div
+                          className="truncate px-2 py-2"
+                          title={pos.email || "-"}
+                        >
+                          {pos.email || "-"}
+                        </div>
+                        <div
+                          className="truncate px-2 py-2"
+                          title={pos.username}
+                        >
+                          {pos.username}
+                        </div>
+                        <div
+                          className="truncate px-2 py-2"
+                          title={pos.branchName || "Main Branch"}
+                        >
+                          {pos.branchName || "Main Branch"}
+                        </div>
+                        <div
+                          className="truncate px-2 py-2"
+                          title={pos.assignedUserId || "-"}
+                        >
+                          {pos.assignedUserId || "-"}
+                        </div>
+                        <div className="px-2 py-2">
+                          <Badge
+                            variant={statusVariant(
+                              pos.deviceStatus || pos.status,
+                            )}
+                          >
+                            {pos.isDeactivated
+                              ? "deactivated"
+                              : pos.deviceStatus || pos.status}
+                          </Badge>
+                        </div>
+                        <div
+                          className="truncate px-2 py-2"
+                          title={pos.activeSession?.deviceName || "-"}
+                        >
+                          {pos.activeSession?.deviceName || "-"}
+                        </div>
+                        <div className="px-2 py-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                launchPOSMutation.isPending ||
+                                pos.isDeactivated ||
+                                (pos.deviceStatus || "active") !== "active"
+                              }
+                              onClick={() =>
+                                launchSelectedPOS({
+                                  id: pos.id,
+                                  posName: pos.posName,
+                                })
+                              }
+                            >
+                              {launchPOSMutation.isPending &&
+                              launchPOSMutation.variables?.id === pos.id
+                                ? "Opening..."
+                                : "Open POS"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingPos({
+                                  id: pos.id,
+                                  posName: pos.posName,
+                                  email: pos.email,
+                                  username: pos.username,
+                                  branchId: pos.branchId,
+                                  assignedUserId: pos.assignedUserId,
+                                  deviceStatus: pos.deviceStatus,
+                                });
+                                setEditModalOpen(true);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                deactivatePOSMutation.isPending ||
+                                pos.isDeactivated
+                              }
+                              onClick={() =>
+                                deactivatePOSMutation.mutate(pos.id)
+                              }
+                            >
+                              Deactivate
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Sessions</CardTitle>
+            </CardHeader>
+            <CardContent className="px-0">
               <VirtualizedSimpleBarList
                 items={sessionListQuery.data?.data || []}
                 height={ORDER_LIST_HEIGHT_PX}
                 estimateSize={ORDER_CARD_ESTIMATE_SIZE_PX}
                 gap={ORDER_CARD_GAP_PX}
                 overscan={8}
-                // className="rounded-xl border border-slate-200 bg-slate-50/70"
                 getItemKey={(session) => session.id}
                 renderItem={(session) => (
                   <div
@@ -623,10 +628,10 @@ export default function SellerPOSPage() {
                   </div>
                 )}
               />
-              {/* </div> */}
             </CardContent>
-          </CardHeader>
-        </Card>
+          </Card>
+        )}
+
         <EditPOSModal
           open={editModalOpen}
           onClose={() => setEditModalOpen(false)}
