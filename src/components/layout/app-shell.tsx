@@ -14,6 +14,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const isMobileSidebarOpen = mobileSidebarPath === pathname;
   const isSellerRoute = pathname.startsWith("/seller");
   const isPOSRoute = pathname.startsWith("/pos");
+  const useDocumentScrollLayout = pathname.startsWith("/seller/store-config");
   const hideTopHeader = pathname.startsWith("/pos");
   const hideTopHeaderOnMobile = isSellerRoute && !hideTopHeader;
   const useNativeMobileScroll = hideTopHeaderOnMobile;
@@ -55,7 +56,11 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-muted/30">
+    <div
+      className={`flex bg-muted/30 ${
+        useDocumentScrollLayout ? "min-h-screen" : "h-screen overflow-hidden"
+      }`}
+    >
       <Suspense
         fallback={
           <aside className="hidden h-screen w-72 border-r border-slate-200 bg-white/70 md:block" />
@@ -105,10 +110,12 @@ export function AppShell({ children }: PropsWithChildren) {
               ? "overflow-hidden p-0"
               : useNativeMobileScroll
                 ? "overflow-y-auto p-3 pt-8 md:overflow-y-auto md:p-6"
+                : useDocumentScrollLayout
+                  ? "overflow-visible p-3 md:p-6"
                 : "overflow-hidden p-3 md:p-6"
           }`}
         >
-          {isPOSRoute ? children : useNativeMobileScroll ? children : <SimplebarScroll className="h-full">{children}</SimplebarScroll>}
+          {isPOSRoute || useNativeMobileScroll || useDocumentScrollLayout ? children : <SimplebarScroll className="h-full">{children}</SimplebarScroll>}
         </main>
       </div>
     </div>
