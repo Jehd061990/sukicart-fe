@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { branchService } from "@/lib/api/services/branch.service";
+import { paymentService } from "@/lib/api/services/payment.service";
 import { posService } from "@/lib/api/services/pos.service";
 import {
   POS_SELLER_DEFAULT_RETURN_PATH,
@@ -95,6 +96,7 @@ export default function SellerPOSPage() {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [paymentIdFromUrl, setPaymentIdFromUrl] = useState<string | undefined>(undefined);
   const [activeView, setActiveView] = useState<"devices" | "sessions">(
     "devices",
   );
@@ -122,6 +124,36 @@ export default function SellerPOSPage() {
     queryKey: ["seller-pos-sessions"],
     queryFn: posService.listSessions,
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const paymentId = new URLSearchParams(window.location.search).get("paymentId") || undefined;
+    setPaymentIdFromUrl(paymentId);
+  }, []);
+
+  const paymentStatusQuery = useQuery({
+    queryKey: ["subscription-payment-status", paymentIdFromUrl],
+    queryFn: () => paymentService.getPaymentStatus(String(paymentIdFromUrl), { sync: true }),
+    enabled: Boolean(paymentIdFromUrl),
+    refetchInterval: (query) =>
+      query.state.data?.payment?.status === "pending" ? 3500 : false,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (!paymentIdFromUrl) {
+      return;
+    }
+
+    if (paymentStatusQuery.data?.payment?.status === "paid") {
+      queryClient.invalidateQueries({ queryKey: ["seller-subscription-current"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-pos-list"] });
+      queryClient.invalidateQueries({ queryKey: ["seller-pos-sessions"] });
+    }
+  }, [paymentIdFromUrl, paymentStatusQuery.data?.payment?.status, queryClient]);
 
   const createPOSMutation = useMutation({
     mutationFn: posService.createPOSAccount,
@@ -214,6 +246,10 @@ export default function SellerPOSPage() {
 
     return `POS usage: ${usage.active} / ${usage.total} active devices`;
   }, [posListQuery.data?.usage]);
+
+  const isSubscriptionSyncing =
+    Boolean(paymentIdFromUrl) &&
+    (paymentStatusQuery.isLoading || paymentStatusQuery.data?.payment?.status === "pending");
 
   const onCreatePOS = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -325,9 +361,14 @@ const POS_MOBILE_LIST_HEIGHT = "calc(100dvh - 290px)";
             </CardHeader>
             <CardContent className="space-y-5">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <p className="mt-2 font-sans text-sm text-primary-700">
-                {usageLabel}
-              </p>
+                  <div className="mt-2 flex items-center gap-2 font-sans text-sm text-primary-700">
+                    <span>{usageLabel}</span>
+                    {isSubscriptionSyncing ? (
+                      <span className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+                        Syncing subscription update...
+                      </span>
+                    ) : null}
+                  </div>
               <Button
                 onClick={() => setCreateModalOpen(true)}
                 variant="default"

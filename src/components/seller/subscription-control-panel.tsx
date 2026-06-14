@@ -71,6 +71,7 @@ export function SubscriptionControlPanel() {
   const [isPreviewDebouncing, setIsPreviewDebouncing] = useState(false);
   const previewDebounceTimerRef = useRef<number | null>(null);
   const lastSyncedPlanRef = useRef<SubscriptionPlanCode | null>(null);
+  const previousSelectedPlanRef = useRef<SubscriptionPlanCode | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -196,6 +197,24 @@ export function SubscriptionControlPanel() {
     lastSyncedPlanRef.current = currentPlan;
   }, [selectedPlan, subscription?.plan]);
 
+  useEffect(() => {
+    const currentPlan = subscription?.plan as SubscriptionPlanCode | undefined;
+
+    if (!currentPlan) {
+      previousSelectedPlanRef.current = selectedPlan;
+      return;
+    }
+
+    const switchedPlans = previousSelectedPlanRef.current !== selectedPlan;
+    const selectedCurrentPlan = selectedPlan === currentPlan;
+
+    if (selectedCurrentPlan && switchedPlans) {
+      setSelectedAddonSlots(subscription?.addonSlots ?? 0);
+    }
+
+    previousSelectedPlanRef.current = selectedPlan;
+  }, [selectedPlan, subscription?.plan, subscription?.addonSlots]);
+
   const selectedPlanDetail = plans.find((plan) => plan.code === selectedPlan);
   const currentPlanDetail = plans.find((plan) => plan.code === subscription?.plan);
   const currentAddonSlots = subscription?.addonSlots ?? 0;
@@ -210,6 +229,7 @@ export function SubscriptionControlPanel() {
   const additionalMonthlyCost = targetMonthlyBill - currentMonthlyBill;
   const exceedsUsageOnReduce = targetTotalSlots < currentUsedSlots;
   const canManageAddonSlots = ["PRO", "BUSINESS"].includes(subscription?.plan || "");
+  const isCurrentPlanSelected = Boolean(subscription?.plan) && selectedPlan === subscription?.plan;
   const isDowngradingToFree = subscription?.plan !== "FREE" && selectedPlan === "FREE";
   const effectiveDowngradeDate = subscription?.currentPeriodEnd || subscription?.billingDate || subscription?.nextBillingDate || null;
 
@@ -266,6 +286,11 @@ export function SubscriptionControlPanel() {
   };
 
   const onPlanCheckout = () => {
+    if (isCurrentPlanSelected) {
+      toast.info("You are already subscribed to this plan");
+      return;
+    }
+
     if (isDowngradingToFree) {
       setIsDowngradeConfirmOpen(true);
       return;
@@ -425,7 +450,9 @@ export function SubscriptionControlPanel() {
                   type="button"
                   onClick={() => {
                     setSelectedPlan(plan.code);
-                    if (!plan.addonSlotsEnabled) {
+                    if (plan.code === subscription?.plan) {
+                      setSelectedAddonSlots(subscription?.addonSlots ?? 0);
+                    } else if (!plan.addonSlotsEnabled) {
                       setSelectedAddonSlots(0);
                     }
                   }}
@@ -492,7 +519,10 @@ export function SubscriptionControlPanel() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button onClick={onPlanCheckout} disabled={checkoutMutation.isPending}>
+              <Button
+                onClick={onPlanCheckout}
+                disabled={checkoutMutation.isPending || isCurrentPlanSelected}
+              >
                 {checkoutMutation.isPending ? "Processing..." : "Upgrade or Downgrade Plan"}
               </Button>
               <Button
