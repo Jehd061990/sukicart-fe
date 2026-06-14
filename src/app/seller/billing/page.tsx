@@ -29,25 +29,29 @@ export default function SellerBillingPage() {
 
   if (!features.billing) {
     return (
-      <section className="rounded-2xl border border-amber-300 bg-linear-to-br from-amber-50 to-white p-6 shadow-sm">
-        <p className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-          <Lock className="h-3.5 w-3.5" />
-          Locked Module
-        </p>
-        <h1 className="mt-3 text-2xl font-semibold text-foreground">
-          {moduleConfig?.label || "Billing"}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {moduleConfig?.description || "Subscription lifecycle, invoices, and upgrades."}
-        </p>
-        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {moduleConfig?.upgradeMessage || "Upgrade your subscription to unlock this module."}
-        </p>
-        <div className="mt-4">
-          <Link href="/seller/pos">
-            <Button>Open POS</Button>
-          </Link>
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-amber-300 bg-linear-to-br from-amber-50 to-white p-6 shadow-sm">
+          <p className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+            <Lock className="h-3.5 w-3.5" />
+            Locked Module
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold text-foreground">
+            {moduleConfig?.label || "Billing"}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {moduleConfig?.description || "Subscription lifecycle, invoices, and upgrades."}
+          </p>
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {moduleConfig?.upgradeMessage || "Upgrade your subscription to unlock this module."}
+          </p>
+          <div className="mt-4">
+            <Link href="/seller/pos">
+              <Button variant="outline">Open POS</Button>
+            </Link>
+          </div>
         </div>
+
+        <SubscriptionControlPanel />
       </section>
     );
   }
