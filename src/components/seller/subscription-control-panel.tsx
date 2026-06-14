@@ -70,6 +70,7 @@ export function SubscriptionControlPanel() {
   const [debouncedTargetAddonSlots, setDebouncedTargetAddonSlots] = useState(0);
   const [isPreviewDebouncing, setIsPreviewDebouncing] = useState(false);
   const previewDebounceTimerRef = useRef<number | null>(null);
+  const lastSyncedPlanRef = useRef<SubscriptionPlanCode | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -178,6 +179,23 @@ export function SubscriptionControlPanel() {
 
   const subscription = subscriptionQuery.data?.subscription;
   const plans = plansQuery.data?.plans || [];
+
+  useEffect(() => {
+    const currentPlan = subscription?.plan as SubscriptionPlanCode | undefined;
+    if (!currentPlan) {
+      return;
+    }
+
+    const shouldSyncSelection =
+      lastSyncedPlanRef.current === null || selectedPlan === lastSyncedPlanRef.current;
+
+    if (shouldSyncSelection) {
+      setSelectedPlan(currentPlan);
+    }
+
+    lastSyncedPlanRef.current = currentPlan;
+  }, [selectedPlan, subscription?.plan]);
+
   const selectedPlanDetail = plans.find((plan) => plan.code === selectedPlan);
   const currentPlanDetail = plans.find((plan) => plan.code === subscription?.plan);
   const currentAddonSlots = subscription?.addonSlots ?? 0;
@@ -440,7 +458,7 @@ export function SubscriptionControlPanel() {
               </p>
             </div>
 
-            <div>
+            {/* <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
                 Plan Change Timing
               </label>
@@ -460,7 +478,7 @@ export function SubscriptionControlPanel() {
                   Next Cycle
                 </Button>
               </div>
-            </div>
+            </div> */}
 
             <div className="rounded-xl border bg-muted/30 p-3 text-sm">
               <p>
@@ -484,13 +502,13 @@ export function SubscriptionControlPanel() {
               >
                 Add More Slots
               </Button>
-              <Button
+              {/* <Button
                 variant="outline"
                 onClick={() => cancelSubscriptionMutation.mutate()}
                 disabled={cancelSubscriptionMutation.isPending}
               >
                 {cancelSubscriptionMutation.isPending ? "Cancelling..." : "Cancel Subscription"}
-              </Button>
+              </Button> */}
             </div>
           </CardContent>
         </Card>
