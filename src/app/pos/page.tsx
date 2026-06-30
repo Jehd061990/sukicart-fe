@@ -673,7 +673,8 @@ function POSPageContent() {
     return {
       receiptId: `${orderId}-${Date.now()}`,
       orderId,
-      createdAt: new Date().toISOString(),
+      // createdAt: new Date().toISOString(),
+      createdAt: "2025-07-05T22:59:00.000Z", // temporary hardcoded date for testing
       sellerName: storeConfigQuery.data?.store?.name || "SukiGo Store",
       cashierName,
       deviceName: runtimeProfile.runtimeMode.toUpperCase(),
@@ -754,9 +755,7 @@ function POSPageContent() {
         await enqueuePOSOrder(
           {
             ...payload,
-            // createdAt: Date.now(),
-            // createdAt: 1751292900000, // Hardcoded timestamp for testing offline queue
-            createdAt: 1752105600000, // Hardcoded timestamp for testing offline queue
+            createdAt: Date.now(),
           },
           "offline",
         );
