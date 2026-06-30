@@ -755,7 +755,8 @@ function POSPageContent() {
           {
             ...payload,
             // createdAt: Date.now(),
-            createdAt: 1751292900000, // Hardcoded timestamp for testing offline queue
+            // createdAt: 1751292900000, // Hardcoded timestamp for testing offline queue
+            createdAt: 1752105600000, // Hardcoded timestamp for testing offline queue
           },
           "offline",
         );
