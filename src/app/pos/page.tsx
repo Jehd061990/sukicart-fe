@@ -754,7 +754,8 @@ function POSPageContent() {
         await enqueuePOSOrder(
           {
             ...payload,
-            createdAt: Date.now(),
+            // createdAt: Date.now(),
+            createdAt: 1751292900000, // Hardcoded timestamp for testing offline queue
           },
           "offline",
         );
