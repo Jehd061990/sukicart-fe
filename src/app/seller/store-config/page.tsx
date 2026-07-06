@@ -1,20 +1,138 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AccessControlOverridesPanel } from "@/components/seller/access-control-overrides-panel";
+import { PlanFeatureFlagsPanel } from "@/components/seller/plan-feature-flags-panel";
+import { ImageUploadDropzone } from "@/components/uploads/ImageUploadDropzone";
 import { posService } from "@/lib/api/services/pos.service";
-import { ScannerMode, StoreType } from "@/types/store-config";
+import { usePOSDeviceProfile } from "@/hooks/pos/use-device-profile";
+import { printerService } from "@/lib/pos-printing/printer-service";
+import { ThermalPrinterDevice } from "@/lib/pos-printing/types";
+import { usePrinterManagerStore } from "@/store/printer-manager.store";
+import {
+  BusinessTaxType,
+  CategoryThumbnailShape,
+  PreferredPOSMode,
+  ProductTaxType,
+  ScannerMode,
+  StoreTaxConfig,
+  StorePrintingConfig,
+  StoreCategoryImage,
+  StoreCategoryKey,
+  StoreType,
+} from "@/types/store-config";
 
 const SCANNER_MODES: ScannerMode[] = ["hardware", "camera", "manual"];
+const CATEGORY_KEYS: StoreCategoryKey[] = ["vegetables", "meat", "fish"];
+const CATEGORY_DEFAULT_LABELS: Record<StoreCategoryKey, string> = {
+  vegetables: "Vegetables",
+  meat: "Meat",
+  fish: "Fish",
+};
+
+const PRODUCT_TAX_OPTIONS: Array<{ value: ProductTaxType; label: string }> = [
+  { value: "VAT", label: "VAT 12%" },
+  { value: "VAT_EXEMPT", label: "VAT Exempt" },
+  { value: "ZERO_RATED", label: "Zero Rated" },
+  { value: "NON_VAT", label: "Non-VAT" },
+];
+
+const BUSINESS_TAX_OPTIONS: Array<{ value: BusinessTaxType; label: string }> = [
+  { value: "VAT", label: "VAT Registered" },
+  { value: "NON_VAT", label: "Non-VAT Registered" },
+];
+
+const normalizeCategoryTaxDefaults = (
+  input: StoreTaxConfig["categoryDefaults"] | undefined,
+  businessTaxType: BusinessTaxType,
+  defaultVatRate: number,
+) => {
+  return CATEGORY_KEYS.reduce(
+    (acc, key) => {
+      const fromConfig = input?.[key];
+
+      if (businessTaxType === "NON_VAT") {
+        acc[key] = {
+          taxType: "NON_VAT",
+          taxRate: 0,
+        };
+        return acc;
+      }
+
+      acc[key] = {
+        taxType: fromConfig?.taxType || "VAT",
+        taxRate:
+          fromConfig?.taxType === "VAT"
+            ? Number(fromConfig.taxRate || defaultVatRate)
+            : fromConfig?.taxType
+              ? 0
+              : defaultVatRate,
+      };
+      return acc;
+    },
+    {} as Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>,
+  );
+};
+
+const normalizeCategoryCatalog = (
+  input: Array<{
+    key?: string;
+    label?: string;
+    image?: string;
+    images?: StoreCategoryImage[];
+  }> = [],
+) =>
+  CATEGORY_KEYS.map((key) => {
+    const existing = input.find((entry) => entry?.key === key);
+    const images = Array.isArray(existing?.images) ? existing.images : [];
+
+    return {
+      key,
+      label: String(existing?.label || CATEGORY_DEFAULT_LABELS[key]),
+      image: String(existing?.image || images[0]?.url || ""),
+      images,
+    };
+  });
+
+type StoreConfigDraft = {
+  storeType: StoreType;
+  preferredPOSMode: PreferredPOSMode;
+  barcodeScanning: boolean;
+  expiryTracking: boolean;
+  prescriptionRequired: boolean;
+  bulkQuantityInput: boolean;
+  maxLineItems: number;
+  scannerModes: ScannerMode[];
+  defaultScannerMode: ScannerMode;
+  categoryThumbnailShape: CategoryThumbnailShape;
+  printerAdapter: NonNullable<StorePrintingConfig["preferredAdapter"]>;
+  receiptPaperSize: NonNullable<StorePrintingConfig["paperSize"]>;
+  autoPrintReceipts: boolean;
+  desktopPrinterName: string;
+  bluetoothPrinterName: string;
+  bluetoothPrinterMac: string;
+  bluetoothAutoReconnect: boolean;
+  taxEnabled: boolean;
+  businessTaxType: BusinessTaxType;
+  defaultVatRate: number;
+  categoryTaxDefaults: Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>;
+  categoryCatalog: Array<{
+    key: StoreCategoryKey;
+    label: string;
+    image: string;
+    images: StoreCategoryImage[];
+  }>;
+};
 
 const ensureValidScannerMode = (
   selectedModes: ScannerMode[],
   defaultMode: ScannerMode,
-) => {
-  const deduped = Array.from(new Set(selectedModes));
-  const safeModes = deduped.length > 0 ? deduped : ["manual"];
+): { modes: ScannerMode[]; defaultMode: ScannerMode } => {
+  const deduped = Array.from(new Set(selectedModes)) as ScannerMode[];
+  const safeModes: ScannerMode[] = deduped.length > 0 ? deduped : ["manual"];
 
   if (safeModes.includes(defaultMode)) {
     return {
@@ -37,47 +155,356 @@ const STORE_TYPE_LABELS: Record<StoreType, string> = {
   retail: "General Retail",
 };
 
+const POS_MODE_OPTIONS: Array<{ label: string; value: PreferredPOSMode }> = [
+  { label: "Desktop / Laptop", value: "desktop" },
+  { label: "Android Phone / Tablet", value: "android" },
+  { label: "iPhone / iPad", value: "ios" },
+];
+
+const PRINTER_ADAPTER_OPTIONS: Array<{
+  label: string;
+  value: NonNullable<StorePrintingConfig["preferredAdapter"]>;
+}> = [
+  { label: "Auto / Browser", value: "browser" },
+  { label: "Desktop Local Bridge (QZ Tray)", value: "local-bridge" },
+  { label: "Android Bluetooth", value: "bluetooth" },
+  { label: "iOS AirPrint", value: "airprint" },
+];
+
+const getAllowedPrinterAdapters = (
+  runtime: ReturnType<typeof usePOSDeviceProfile>,
+): Array<NonNullable<StorePrintingConfig["preferredAdapter"]>> => {
+  if (runtime.isAndroid) {
+    return ["browser", "bluetooth"];
+  }
+
+  if (runtime.isIOS) {
+    return ["browser", "airprint"];
+  }
+
+  if (runtime.isDesktop) {
+    return ["browser", "local-bridge"];
+  }
+
+  return ["browser"];
+};
+
+type PrinterSectionKey =
+  | "adapterProfile"
+  | "bluetoothManager"
+  | "bridgeHealth"
+  | "setupChecklist"
+  | "actions";
+
+type PrinterSectionsState = Record<PrinterSectionKey, boolean>;
+
+const DEFAULT_PRINTER_SECTION_STATE: PrinterSectionsState = {
+  adapterProfile: true,
+  bluetoothManager: true,
+  bridgeHealth: true,
+  setupChecklist: true,
+  actions: true,
+};
+
+const getRuntimeDisableReason = (
+  adapter: NonNullable<StorePrintingConfig["preferredAdapter"]>,
+  runtime: ReturnType<typeof usePOSDeviceProfile>,
+) => {
+  if (adapter === "browser") {
+    return "";
+  }
+
+  if (adapter === "local-bridge" && !runtime.isDesktop) {
+    return "Desktop/Laptop runtime required";
+  }
+
+  if (adapter === "bluetooth" && !runtime.isAndroid) {
+    return "Android runtime required";
+  }
+
+  if (adapter === "airprint" && !runtime.isIOS) {
+    return "iOS runtime required";
+  }
+
+  return "";
+};
+
 export default function SellerStoreConfigPage() {
-  const [draft, setDraft] = useState<{
-    storeType: StoreType;
-    barcodeScanning: boolean;
-    expiryTracking: boolean;
-    prescriptionRequired: boolean;
-    bulkQuantityInput: boolean;
-    maxLineItems: number;
-    scannerModes: ScannerMode[];
-    defaultScannerMode: ScannerMode;
-  } | null>(null);
+  const [draft, setDraft] = useState<StoreConfigDraft | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [printerActionMessage, setPrinterActionMessage] = useState<string | null>(null);
+  const [bridgeConnectSuccess, setBridgeConnectSuccess] = useState<boolean | null>(null);
+  const [testPrintSuccess, setTestPrintSuccess] = useState<boolean | null>(null);
+  const [printerSectionsOpen, setPrinterSectionsOpen] = useState<PrinterSectionsState>(
+    DEFAULT_PRINTER_SECTION_STATE,
+  );
+  const [taxReportFrom, setTaxReportFrom] = useState("");
+  const [taxReportTo, setTaxReportTo] = useState("");
+  const [appliedTaxReportFrom, setAppliedTaxReportFrom] = useState("");
+  const [appliedTaxReportTo, setAppliedTaxReportTo] = useState("");
+  const [isExportingTaxCsv, setIsExportingTaxCsv] = useState(false);
+  const [isExportingTaxDetailCsv, setIsExportingTaxDetailCsv] = useState(false);
+  const desktopPrinterInputRef = useRef<HTMLInputElement | null>(null);
+  const checklistHydratedKeyRef = useRef<string | null>(null);
+  const sectionsHydratedKeyRef = useRef<string | null>(null);
 
   const queryClient = useQueryClient();
+  const discoveredPrinters = usePrinterManagerStore((state) => state.discoveredPrinters);
+  const selectedPrinter = usePrinterManagerStore((state) => state.selectedPrinter);
+  const connectionStatus = usePrinterManagerStore((state) => state.connectionStatus);
+  const isScanning = usePrinterManagerStore((state) => state.isScanning);
+  const isConnecting = usePrinterManagerStore((state) => state.isConnecting);
+  const setDiscoveredPrinters = usePrinterManagerStore((state) => state.setDiscoveredPrinters);
+  const setSelectedPrinter = usePrinterManagerStore((state) => state.setSelectedPrinter);
+  const setConnectionState = usePrinterManagerStore((state) => state.setConnectionState);
+  const setPaperSize = usePrinterManagerStore((state) => state.setPaperSize);
+  const setAutoReconnect = usePrinterManagerStore((state) => state.setAutoReconnect);
+  const setScanning = usePrinterManagerStore((state) => state.setScanning);
+  const setConnecting = usePrinterManagerStore((state) => state.setConnecting);
+  const removeSavedPrinter = usePrinterManagerStore((state) => state.removeSavedPrinter);
 
   const storeConfigQuery = useQuery({
     queryKey: ["store-config", "me"],
     queryFn: () => posService.getStoreConfig(),
   });
 
-  const baseForm = useMemo(() => {
+  const baseForm = useMemo<StoreConfigDraft | null>(() => {
     if (!storeConfigQuery.data) {
       return null;
     }
 
     const config = storeConfigQuery.data.config;
+    const printing = config.printing || {};
+    const tax = config.tax || {
+      enabled: true,
+      businessTaxType: "VAT",
+      defaultVatRate: 12,
+      categoryDefaults: {},
+    };
+    const businessTaxType = (tax.businessTaxType || "VAT") as BusinessTaxType;
+    const defaultVatRate = Number(tax.defaultVatRate || 12);
+    const bluetoothPrinter = printing.bluetoothPrinter;
     return {
       storeType: storeConfigQuery.data.store.storeType,
+      preferredPOSMode: storeConfigQuery.data.store.preferredPOSMode || "desktop",
       barcodeScanning: Boolean(config.features.barcodeScanning),
       expiryTracking: Boolean(config.features.expiryTracking),
       prescriptionRequired: Boolean(config.features.prescriptionRequired),
       bulkQuantityInput: Boolean(config.features.bulkQuantityInput),
       maxLineItems: Number(config.businessRules.maxLineItems || 200),
-      scannerModes: Array.isArray(config.uiBehavior.scannerModes)
-        ? config.uiBehavior.scannerModes
-        : ["manual"],
-      defaultScannerMode: config.uiBehavior.defaultScannerMode || "manual",
+      scannerModes: ensureValidScannerMode(
+        (Array.isArray(config.uiBehavior.scannerModes)
+          ? config.uiBehavior.scannerModes.filter((mode): mode is ScannerMode =>
+              SCANNER_MODES.includes(mode as ScannerMode),
+            )
+          : ["manual"]) as ScannerMode[],
+        SCANNER_MODES.includes(config.uiBehavior.defaultScannerMode as ScannerMode)
+          ? (config.uiBehavior.defaultScannerMode as ScannerMode)
+          : "manual",
+      ).modes,
+      defaultScannerMode: ensureValidScannerMode(
+        (Array.isArray(config.uiBehavior.scannerModes)
+          ? config.uiBehavior.scannerModes.filter((mode): mode is ScannerMode =>
+              SCANNER_MODES.includes(mode as ScannerMode),
+            )
+          : ["manual"]) as ScannerMode[],
+        SCANNER_MODES.includes(config.uiBehavior.defaultScannerMode as ScannerMode)
+          ? (config.uiBehavior.defaultScannerMode as ScannerMode)
+          : "manual",
+      ).defaultMode,
+      categoryThumbnailShape:
+        config.uiBehavior.categoryThumbnailShape === "circle"
+          ? "circle"
+          : "rounded",
+      printerAdapter: printing.preferredAdapter || "browser",
+      receiptPaperSize: printing.paperSize || "80mm",
+      autoPrintReceipts: printing.autoPrint !== false,
+      desktopPrinterName: String(printing.desktopPrinterName || ""),
+      bluetoothPrinterName: String(bluetoothPrinter?.printerName || ""),
+      bluetoothPrinterMac: String(bluetoothPrinter?.printerMac || ""),
+      bluetoothAutoReconnect: bluetoothPrinter?.autoReconnect !== false,
+      taxEnabled: tax.enabled !== false,
+      businessTaxType,
+      defaultVatRate,
+      categoryTaxDefaults: normalizeCategoryTaxDefaults(
+        tax.categoryDefaults,
+        businessTaxType,
+        defaultVatRate,
+      ),
+      categoryCatalog: normalizeCategoryCatalog(config.uiBehavior.categoryCatalog),
     };
   }, [storeConfigQuery.data]);
 
   const form = draft || baseForm;
+  const previewPreferredPOSMode =
+    draft?.preferredPOSMode || storeConfigQuery.data?.store?.preferredPOSMode || "desktop";
+  const runtimeProfile = usePOSDeviceProfile(previewPreferredPOSMode);
+  const allowedPrinterAdapters = getAllowedPrinterAdapters(runtimeProfile);
+  const checklistStorageKey = useMemo(() => {
+    const storeId = storeConfigQuery.data?.store?.id;
+    const adapter = form?.printerAdapter;
+
+    if (!storeId || !adapter) {
+      return null;
+    }
+
+    return `sukigo-printer-checklist:${storeId}:${adapter}`;
+  }, [form?.printerAdapter, storeConfigQuery.data?.store?.id]);
+  const sectionsStorageKey = useMemo(() => {
+    const storeId = storeConfigQuery.data?.store?.id;
+    if (!storeId) {
+      return null;
+    }
+
+    return `sukigo-printer-sections:${storeId}`;
+  }, [storeConfigQuery.data?.store?.id]);
+
+  useEffect(() => {
+    if (!checklistStorageKey || typeof window === "undefined") {
+      return;
+    }
+
+    const raw = window.localStorage.getItem(checklistStorageKey);
+    if (!raw) {
+      setBridgeConnectSuccess(null);
+      setTestPrintSuccess(null);
+      checklistHydratedKeyRef.current = checklistStorageKey;
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        bridgeConnectSuccess?: boolean | null;
+        testPrintSuccess?: boolean | null;
+      };
+
+      setBridgeConnectSuccess(
+        typeof parsed.bridgeConnectSuccess === "boolean"
+          ? parsed.bridgeConnectSuccess
+          : null,
+      );
+      setTestPrintSuccess(
+        typeof parsed.testPrintSuccess === "boolean" ? parsed.testPrintSuccess : null,
+      );
+    } catch {
+      setBridgeConnectSuccess(null);
+      setTestPrintSuccess(null);
+    }
+
+    checklistHydratedKeyRef.current = checklistStorageKey;
+  }, [checklistStorageKey]);
+
+  useEffect(() => {
+    if (!sectionsStorageKey || typeof window === "undefined") {
+      return;
+    }
+
+    const raw = window.localStorage.getItem(sectionsStorageKey);
+    if (!raw) {
+      setPrinterSectionsOpen(DEFAULT_PRINTER_SECTION_STATE);
+      sectionsHydratedKeyRef.current = sectionsStorageKey;
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<PrinterSectionsState>;
+      setPrinterSectionsOpen({
+        adapterProfile:
+          typeof parsed.adapterProfile === "boolean"
+            ? parsed.adapterProfile
+            : DEFAULT_PRINTER_SECTION_STATE.adapterProfile,
+        bluetoothManager:
+          typeof parsed.bluetoothManager === "boolean"
+            ? parsed.bluetoothManager
+            : DEFAULT_PRINTER_SECTION_STATE.bluetoothManager,
+        bridgeHealth:
+          typeof parsed.bridgeHealth === "boolean"
+            ? parsed.bridgeHealth
+            : DEFAULT_PRINTER_SECTION_STATE.bridgeHealth,
+        setupChecklist:
+          typeof parsed.setupChecklist === "boolean"
+            ? parsed.setupChecklist
+            : DEFAULT_PRINTER_SECTION_STATE.setupChecklist,
+        actions:
+          typeof parsed.actions === "boolean"
+            ? parsed.actions
+            : DEFAULT_PRINTER_SECTION_STATE.actions,
+      });
+    } catch {
+      setPrinterSectionsOpen(DEFAULT_PRINTER_SECTION_STATE);
+    }
+
+    sectionsHydratedKeyRef.current = sectionsStorageKey;
+  }, [sectionsStorageKey]);
+
+  useEffect(() => {
+    if (!checklistStorageKey || typeof window === "undefined") {
+      return;
+    }
+
+    if (checklistHydratedKeyRef.current !== checklistStorageKey) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      checklistStorageKey,
+      JSON.stringify({
+        bridgeConnectSuccess,
+        testPrintSuccess,
+      }),
+    );
+  }, [bridgeConnectSuccess, checklistStorageKey, testPrintSuccess]);
+
+  useEffect(() => {
+    if (!sectionsStorageKey || typeof window === "undefined") {
+      return;
+    }
+
+    if (sectionsHydratedKeyRef.current !== sectionsStorageKey) {
+      return;
+    }
+
+    window.localStorage.setItem(sectionsStorageKey, JSON.stringify(printerSectionsOpen));
+  }, [printerSectionsOpen, sectionsStorageKey]);
+
+  useEffect(() => {
+    if (!form) {
+      return;
+    }
+
+    setPaperSize(form.receiptPaperSize);
+    setAutoReconnect(form.bluetoothAutoReconnect);
+
+    if (form.bluetoothPrinterMac || form.bluetoothPrinterName) {
+      setSelectedPrinter({
+        id: form.bluetoothPrinterMac || form.bluetoothPrinterName,
+        name: form.bluetoothPrinterName || "Saved Bluetooth Printer",
+        macAddress: form.bluetoothPrinterMac || undefined,
+        connectionType: "bluetooth",
+      });
+    }
+  }, [
+    form,
+    setAutoReconnect,
+    setPaperSize,
+    setSelectedPrinter,
+  ]);
+
+  useEffect(() => {
+    if (!form) {
+      return;
+    }
+
+    if (allowedPrinterAdapters.includes(form.printerAdapter)) {
+      return;
+    }
+
+    const fallbackAdapter = allowedPrinterAdapters[0] || "browser";
+    setDraft({
+      ...form,
+      printerAdapter: fallbackAdapter,
+    });
+  }, [allowedPrinterAdapters, form]);
 
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -88,6 +515,7 @@ export default function SellerStoreConfigPage() {
 
       return posService.updateStoreConfig({
         storeType: form?.storeType,
+        preferredPOSMode: form?.preferredPOSMode,
         configOverrides: {
           features: {
             barcodeScanning: Boolean(form?.barcodeScanning),
@@ -99,12 +527,59 @@ export default function SellerStoreConfigPage() {
             maxLineItems: Number(form?.maxLineItems || 200),
             paymentMethods: ["cash"],
           },
+          tax: {
+            enabled:
+              form?.businessTaxType === "NON_VAT"
+                ? false
+                : Boolean(form?.taxEnabled),
+            businessTaxType: form?.businessTaxType || "VAT",
+            defaultVatRate: Number(form?.defaultVatRate || 12),
+            categoryDefaults: CATEGORY_KEYS.reduce((acc, key) => {
+              const entry = form?.categoryTaxDefaults[key];
+              acc[key] = {
+                taxType:
+                  form?.businessTaxType === "NON_VAT"
+                    ? "NON_VAT"
+                    : entry?.taxType || "VAT",
+                taxRate:
+                  form?.businessTaxType === "NON_VAT"
+                    ? 0
+                    : entry?.taxType === "VAT"
+                      ? Number(entry?.taxRate || form?.defaultVatRate || 12)
+                      : 0,
+              };
+              return acc;
+            }, {} as Record<StoreCategoryKey, { taxType: ProductTaxType; taxRate: number }>),
+          },
           uiBehavior: {
             showPrescriptionInput: Boolean(form?.prescriptionRequired),
             showBarcodeScanner: Boolean(form?.barcodeScanning),
             showBulkQuantityActions: Boolean(form?.bulkQuantityInput),
             scannerModes: scanner.modes,
             defaultScannerMode: scanner.defaultMode,
+            categoryThumbnailShape: form?.categoryThumbnailShape || "rounded",
+            categoryCatalog: (form?.categoryCatalog || []).map((entry) => ({
+              key: entry.key,
+              label: String(entry.label || CATEGORY_DEFAULT_LABELS[entry.key]).trim(),
+              image: String(entry.image || entry.images?.[0]?.url || ""),
+              images: Array.isArray(entry.images) ? entry.images : [],
+            })),
+          },
+          printing: {
+            preferredAdapter: form?.printerAdapter || "browser",
+            paperSize: form?.receiptPaperSize || "80mm",
+            autoPrint: Boolean(form?.autoPrintReceipts),
+            desktopPrinterName: String(form?.desktopPrinterName || "").trim(),
+            bluetoothPrinter:
+              form?.bluetoothPrinterMac || form?.bluetoothPrinterName
+                ? {
+                    printerName: String(form?.bluetoothPrinterName || "").trim(),
+                    printerMac: String(form?.bluetoothPrinterMac || "").trim(),
+                    connectionType: "bluetooth",
+                    paperSize: form?.receiptPaperSize || "58mm",
+                    autoReconnect: Boolean(form?.bluetoothAutoReconnect),
+                  }
+                : null,
           },
         },
       });
@@ -133,6 +608,84 @@ export default function SellerStoreConfigPage() {
     return storeConfigQuery.data.config.modules;
   }, [storeConfigQuery.data]);
 
+  const taxSummaryQuery = useQuery({
+    queryKey: ["pos-tax-summary", appliedTaxReportFrom, appliedTaxReportTo],
+    queryFn: () =>
+      posService.getTaxSummaryReport({
+        from: appliedTaxReportFrom || undefined,
+        to: appliedTaxReportTo || undefined,
+      }),
+  });
+
+  const applyTaxReportFilters = () => {
+    setAppliedTaxReportFrom(taxReportFrom);
+    setAppliedTaxReportTo(taxReportTo);
+  };
+
+  const exportTaxSummaryCsv = async () => {
+    setIsExportingTaxCsv(true);
+    try {
+      const blob = await posService.downloadTaxSummaryCsv({
+        from: appliedTaxReportFrom || undefined,
+        to: appliedTaxReportTo || undefined,
+      });
+
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `sukigo-tax-summary-${dateStamp}.csv`;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : "Failed to export tax CSV";
+      setStatusMessage(message);
+    } finally {
+      setIsExportingTaxCsv(false);
+    }
+  };
+
+  const exportTaxDetailedCsv = async () => {
+    setIsExportingTaxDetailCsv(true);
+    try {
+      const blob = await posService.downloadTaxDetailedCsv({
+        from: appliedTaxReportFrom || undefined,
+        to: appliedTaxReportTo || undefined,
+      });
+
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `sukigo-tax-detailed-${dateStamp}.csv`;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      const message =
+        typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : "Failed to export detailed tax CSV";
+      setStatusMessage(message);
+    } finally {
+      setIsExportingTaxDetailCsv(false);
+    }
+  };
+
   if (storeConfigQuery.isLoading) {
     return <div className="rounded-xl border bg-card p-4">Loading store config...</div>;
   }
@@ -149,7 +702,7 @@ export default function SellerStoreConfigPage() {
     return null;
   }
 
-  const updateDraft = (next: Partial<typeof form>) => {
+  const updateDraft = (next: Partial<StoreConfigDraft>) => {
     setDraft({
       ...form,
       ...next,
@@ -166,6 +719,370 @@ export default function SellerStoreConfigPage() {
       scannerModes: scanner.modes,
       defaultScannerMode: scanner.defaultMode,
     });
+  };
+
+  const updateCategoryCatalog = (
+    key: StoreCategoryKey,
+    next: Partial<{
+      label: string;
+      image: string;
+      images: StoreCategoryImage[];
+    }>,
+  ) => {
+    updateDraft({
+      categoryCatalog: form.categoryCatalog.map((entry) => {
+        if (entry.key !== key) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          ...next,
+        };
+      }),
+    });
+  };
+
+  const connectPrinterBridge = async () => {
+    const result = await printerService.connectPrinter(
+      {
+      runtimeProfile,
+      preferredAdapter: form.printerAdapter,
+      preferBluetooth: form.printerAdapter === "bluetooth",
+      printerName: form.desktopPrinterName.trim() || undefined,
+        selectedPrinter: selectedPrinter || undefined,
+        printerSettings:
+          form.printerAdapter === "bluetooth" && selectedPrinter
+            ? {
+                printerName: selectedPrinter.name,
+                printerMac: selectedPrinter.macAddress || selectedPrinter.id,
+                connectionType: "bluetooth",
+                paperSize: form.receiptPaperSize,
+                autoReconnect: form.bluetoothAutoReconnect,
+              }
+            : undefined,
+      },
+      selectedPrinter || undefined,
+    );
+
+    setConnectionState(result.status, result.message);
+    setPrinterActionMessage(`${result.status}: ${result.message}`);
+    setBridgeConnectSuccess(result.status === "CONNECTED");
+  };
+
+  const scanBluetoothPrinters = async () => {
+    setScanning(true);
+    try {
+      const result = await printerService.scanPrinters({
+        runtimeProfile,
+        preferredAdapter: "bluetooth",
+        preferBluetooth: true,
+      });
+
+      setDiscoveredPrinters(result.printers);
+      setPrinterActionMessage(result.message);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const connectBluetoothPrinter = async (printer: ThermalPrinterDevice) => {
+    setSelectedPrinter(printer);
+    updateDraft({
+      printerAdapter: "bluetooth",
+      bluetoothPrinterName: printer.name,
+      bluetoothPrinterMac: printer.macAddress || printer.id,
+    });
+    await connectPrinterBridge();
+  };
+
+  const disconnectBluetoothPrinter = async () => {
+    setConnecting(true);
+    try {
+      const result = await printerService.disconnectPrinter(
+        {
+          runtimeProfile,
+          preferredAdapter: "bluetooth",
+          preferBluetooth: true,
+          selectedPrinter: selectedPrinter || undefined,
+        },
+        selectedPrinter || undefined,
+      );
+      setConnectionState(result.status, result.message);
+      setPrinterActionMessage(`${result.status}: ${result.message}`);
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const savePreferredBluetoothPrinter = () => {
+    if (!selectedPrinter) {
+      setPrinterActionMessage("Select a Bluetooth printer before saving.");
+      return;
+    }
+
+    updateDraft({
+      printerAdapter: "bluetooth",
+      bluetoothPrinterName: selectedPrinter.name,
+      bluetoothPrinterMac: selectedPrinter.macAddress || selectedPrinter.id,
+    });
+    setPrinterActionMessage(`Saved ${selectedPrinter.name} as default Bluetooth printer.`);
+  };
+
+  const removePreferredBluetoothPrinter = () => {
+    removeSavedPrinter();
+    updateDraft({
+      bluetoothPrinterName: "",
+      bluetoothPrinterMac: "",
+    });
+    setPrinterActionMessage("Saved Bluetooth printer removed.");
+  };
+
+  const runFixIt = async (adapter: NonNullable<StorePrintingConfig["preferredAdapter"]>) => {
+    updateDraft({ printerAdapter: adapter });
+
+    if (adapter === "local-bridge") {
+      if (!form.desktopPrinterName.trim()) {
+        desktopPrinterInputRef.current?.focus();
+        setPrinterActionMessage("Set desktop printer name, then click Connect Bridge.");
+        return;
+      }
+
+      await connectPrinterBridge();
+      return;
+    }
+
+    if (adapter === "bluetooth" || adapter === "airprint") {
+      await connectPrinterBridge();
+      return;
+    }
+
+    setPrinterActionMessage("Browser fallback is ready. Use Test Print to verify output.");
+  };
+
+  const testPrint = async () => {
+    const result = await printerService.printReceipt(
+      {
+        receiptId: `test-${Date.now()}`,
+        orderId: "TEST-PRINT",
+        createdAt: new Date().toISOString(),
+        sellerName: storeConfigQuery.data?.store.name || "SukiGo",
+        cashierName: "Seller Admin",
+        deviceName: runtimeProfile.runtimeMode.toUpperCase(),
+        paperSize: form.receiptPaperSize,
+        items: [
+          { name: "Sample Item", quantity: 1, price: 1 },
+          { name: "Printer Calibration", quantity: 1, price: 0 },
+        ],
+        subtotal: 1,
+        discount: 0,
+        total: 1,
+        vat: 0.12,
+        paymentMethod: "Test",
+        qrCodeValue: `SukiGo Test ${new Date().toISOString()}`,
+        barcodeValue: "SUKIGO-TEST",
+        footerText: "Thermal printer validation complete.",
+      },
+      {
+        runtimeProfile,
+        preferredAdapter: form.printerAdapter,
+        preferBluetooth: form.printerAdapter === "bluetooth",
+        printerName: form.desktopPrinterName.trim() || undefined,
+        selectedPrinter: selectedPrinter || undefined,
+        printerSettings:
+          form.printerAdapter === "bluetooth" && selectedPrinter
+            ? {
+                printerName: selectedPrinter.name,
+                printerMac: selectedPrinter.macAddress || selectedPrinter.id,
+                connectionType: "bluetooth",
+                paperSize: form.receiptPaperSize,
+                autoReconnect: form.bluetoothAutoReconnect,
+              }
+            : undefined,
+      },
+    );
+
+    setPrinterActionMessage(`${result.status}: ${result.message}`);
+    setTestPrintSuccess(result.status === "PRINT_SUCCESS");
+  };
+
+  const resetChecklistProgress = () => {
+    setBridgeConnectSuccess(null);
+    setTestPrintSuccess(null);
+    setPrinterActionMessage("Checklist progress reset for this adapter.");
+
+    if (checklistStorageKey && typeof window !== "undefined") {
+      window.localStorage.removeItem(checklistStorageKey);
+    }
+  };
+
+  const togglePrinterSection = (section: PrinterSectionKey, nextOpen: boolean) => {
+    setPrinterSectionsOpen((current) => ({
+      ...current,
+      [section]: nextOpen,
+    }));
+  };
+
+  const setAllPrinterSections = (open: boolean) => {
+    setPrinterSectionsOpen({
+      adapterProfile: open,
+      bluetoothManager: open,
+      bridgeHealth: open,
+      setupChecklist: open,
+      actions: open,
+    });
+  };
+
+  const bridgeHealth = printerService.getBridgeHealth({
+    runtimeProfile,
+    preferredAdapter: form.printerAdapter,
+    preferBluetooth: form.printerAdapter === "bluetooth",
+    printerName: form.desktopPrinterName.trim() || undefined,
+      selectedPrinter: selectedPrinter || undefined,
+  });
+
+  const adapterDiagnostics = PRINTER_ADAPTER_OPTIONS.map((option) => {
+    const runtimeReason = getRuntimeDisableReason(option.value, runtimeProfile);
+    const runtimeAllowed = !runtimeReason;
+
+    const health = printerService.getBridgeHealth({
+      runtimeProfile,
+      preferredAdapter: option.value,
+      preferBluetooth: option.value === "bluetooth",
+      printerName: form.desktopPrinterName.trim() || undefined,
+    });
+
+    const available = runtimeAllowed && health.available;
+    const reason = !runtimeAllowed ? runtimeReason : !health.available ? health.message : "Ready";
+
+    return {
+      ...option,
+      runtimeAllowed,
+      available,
+      reason,
+    };
+  });
+
+  const setupChecklist =
+    form.printerAdapter === "local-bridge"
+      ? [
+          {
+            text: "Install QZ Tray on the cashier desktop/laptop.",
+            status: "done" as const,
+          },
+          {
+            text: "Open QZ Tray and allow this POS web origin.",
+            status: bridgeHealth.available ? ("done" as const) : ("pending" as const),
+          },
+          {
+            text: "Set desktop printer name in this settings page.",
+            status: form.desktopPrinterName.trim() ? ("done" as const) : ("pending" as const),
+          },
+          {
+            text: "Click Connect Bridge then run Test Print.",
+            status:
+              bridgeConnectSuccess === false || testPrintSuccess === false
+                ? ("needs-attention" as const)
+                : bridgeConnectSuccess && testPrintSuccess
+                  ? ("done" as const)
+                  : ("pending" as const),
+          },
+        ]
+      : form.printerAdapter === "bluetooth"
+        ? [
+            {
+              text: "Install Android app build with Bluetooth printer plugin.",
+              status: bridgeHealth.available ? ("done" as const) : ("pending" as const),
+            },
+            {
+              text: "Pair thermal printer from Android Bluetooth settings.",
+              status: "pending" as const,
+            },
+            {
+              text: "Open POS in app/PWA and tap Connect Bridge.",
+              status:
+                bridgeConnectSuccess === true
+                  ? ("done" as const)
+                  : bridgeConnectSuccess === false
+                    ? ("needs-attention" as const)
+                    : ("pending" as const),
+            },
+            {
+              text: "Run Test Print and keep paper width aligned to selected size.",
+              status:
+                testPrintSuccess === true
+                  ? ("done" as const)
+                  : testPrintSuccess === false
+                    ? ("needs-attention" as const)
+                    : ("pending" as const),
+            },
+          ]
+        : form.printerAdapter === "airprint"
+          ? [
+              {
+                text: "Ensure iPhone/iPad and AirPrint printer are on same Wi-Fi.",
+                status: "pending" as const,
+              },
+              {
+                text: "Open POS on Safari or installed iOS web app.",
+                status: "done" as const,
+              },
+              {
+                text: "Use Test Print to open AirPrint sheet.",
+                status:
+                  testPrintSuccess === true
+                    ? ("done" as const)
+                    : testPrintSuccess === false
+                      ? ("needs-attention" as const)
+                      : ("pending" as const),
+              },
+              {
+                text: "Confirm printer, copies, and paper size in iOS print dialog.",
+                status: "pending" as const,
+              },
+            ]
+          : [
+              {
+                text: "Browser fallback uses native print dialog.",
+                status: "done" as const,
+              },
+              {
+                text: "Use Test Print to verify output and margins.",
+                status:
+                  testPrintSuccess === true
+                    ? ("done" as const)
+                    : testPrintSuccess === false
+                      ? ("needs-attention" as const)
+                      : ("pending" as const),
+              },
+              {
+                text: "Choose Save as PDF if printer is temporarily unavailable.",
+                status: "pending" as const,
+              },
+            ];
+
+  const checklistStatusClass = (status: "pending" | "done" | "needs-attention") => {
+    if (status === "done") {
+      return "bg-emerald-100 text-emerald-700";
+    }
+
+    if (status === "needs-attention") {
+      return "bg-rose-100 text-rose-700";
+    }
+
+    return "bg-slate-200 text-slate-700";
+  };
+
+  const checklistStatusLabel = (status: "pending" | "done" | "needs-attention") => {
+    if (status === "done") {
+      return "Done";
+    }
+
+    if (status === "needs-attention") {
+      return "Needs Attention";
+    }
+
+    return "Pending";
   };
 
   return (
@@ -220,6 +1137,21 @@ export default function SellerStoreConfigPage() {
               });
             }}
           />
+
+          <label className="mt-4 mb-2 block text-sm font-medium">Preferred POS Device Mode</label>
+          <select
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={form.preferredPOSMode}
+            onChange={(event) => {
+              updateDraft({ preferredPOSMode: event.target.value as PreferredPOSMode });
+            }}
+          >
+            {POS_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </article>
 
         <article className="rounded-xl border bg-card p-4 shadow-sm">
@@ -270,8 +1202,196 @@ export default function SellerStoreConfigPage() {
               />
             </label>
           </div>
+
         </article>
       </div>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Tax Configuration</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Configure VAT behavior once. POS checkout auto-computes mixed VAT and exempt items.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium">Business Tax Type</label>
+            <select
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={form.businessTaxType}
+              onChange={(event) => {
+                const nextBusinessTaxType = event.target.value as BusinessTaxType;
+                updateDraft({
+                  businessTaxType: nextBusinessTaxType,
+                  taxEnabled: nextBusinessTaxType === "NON_VAT" ? false : form.taxEnabled,
+                  categoryTaxDefaults: normalizeCategoryTaxDefaults(
+                    form.categoryTaxDefaults,
+                    nextBusinessTaxType,
+                    form.defaultVatRate,
+                  ),
+                });
+              }}
+            >
+              {BUSINESS_TAX_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">Default VAT Rate (%)</label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              disabled={form.businessTaxType === "NON_VAT"}
+              value={String(form.defaultVatRate)}
+              onChange={(event) => {
+                const nextRate = Number(event.target.value || 12);
+                updateDraft({ defaultVatRate: nextRate });
+              }}
+            />
+          </div>
+        </div>
+
+        <label className="mt-3 flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+          <span>Tax Enabled</span>
+          <input
+            type="checkbox"
+            checked={form.businessTaxType === "NON_VAT" ? false : form.taxEnabled}
+            disabled={form.businessTaxType === "NON_VAT"}
+            onChange={(event) => updateDraft({ taxEnabled: event.target.checked })}
+          />
+        </label>
+
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category Default Tax</p>
+          {CATEGORY_KEYS.map((key) => {
+            const defaultEntry = form.categoryTaxDefaults[key];
+            return (
+              <div key={key} className="grid gap-2 rounded-md border p-2 md:grid-cols-[1fr_180px_120px]">
+                <div className="text-sm font-medium capitalize text-slate-700">{key}</div>
+                <select
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                  value={defaultEntry.taxType}
+                  disabled={form.businessTaxType === "NON_VAT"}
+                  onChange={(event) => {
+                    const nextTaxType = event.target.value as ProductTaxType;
+                    updateDraft({
+                      categoryTaxDefaults: {
+                        ...form.categoryTaxDefaults,
+                        [key]: {
+                          taxType: nextTaxType,
+                          taxRate: nextTaxType === "VAT" ? Number(defaultEntry.taxRate || form.defaultVatRate) : 0,
+                        },
+                      },
+                    });
+                  }}
+                >
+                  {PRODUCT_TAX_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  disabled={form.businessTaxType === "NON_VAT" || defaultEntry.taxType !== "VAT"}
+                  value={String(defaultEntry.taxRate)}
+                  onChange={(event) =>
+                    updateDraft({
+                      categoryTaxDefaults: {
+                        ...form.categoryTaxDefaults,
+                        [key]: {
+                          ...defaultEntry,
+                          taxRate: Number(event.target.value || 0),
+                        },
+                      },
+                    })
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="mt-2 text-xs text-slate-600">
+          Non-VAT businesses force all products to Non-VAT and disable VAT computation.
+        </p>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Tax Reports</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          VAT Sales Report, VAT Exempt Report, Zero Rated Report, and Tax Summary.
+        </p>
+
+        <div className="mb-3 grid gap-2 md:grid-cols-[1fr_1fr_auto_auto_auto]">
+          <Input
+            type="date"
+            value={taxReportFrom}
+            onChange={(event) => setTaxReportFrom(event.target.value)}
+          />
+          <Input
+            type="date"
+            value={taxReportTo}
+            onChange={(event) => setTaxReportTo(event.target.value)}
+          />
+          <Button type="button" variant="outline" onClick={applyTaxReportFilters}>
+            Apply Filter
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isExportingTaxCsv}
+            onClick={() => void exportTaxSummaryCsv()}
+          >
+            {isExportingTaxCsv ? "Exporting..." : "Export CSV"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isExportingTaxDetailCsv}
+            onClick={() => void exportTaxDetailedCsv()}
+          >
+            {isExportingTaxDetailCsv ? "Exporting..." : "Export Detailed CSV"}
+          </Button>
+        </div>
+
+        <p className="mb-3 text-xs text-slate-500">
+          Active range: {appliedTaxReportFrom || "Any"} to {appliedTaxReportTo || "Any"}
+        </p>
+
+        {taxSummaryQuery.isLoading ? (
+          <p className="text-sm text-slate-500">Loading tax reports...</p>
+        ) : taxSummaryQuery.isError ? (
+          <p className="text-sm text-rose-600">Failed to load tax report summary.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">VAT Sales Report</p>
+              <p className="font-semibold text-slate-900">PHP {Number(taxSummaryQuery.data?.summary.vatableSales || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">VAT Exempt Sales Report</p>
+              <p className="font-semibold text-slate-900">PHP {Number(taxSummaryQuery.data?.summary.vatExemptSales || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">Zero Rated Report</p>
+              <p className="font-semibold text-slate-900">PHP {Number(taxSummaryQuery.data?.summary.zeroRatedSales || 0).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+              <p className="text-slate-500">Tax Summary</p>
+              <p className="font-semibold text-slate-900">VAT PHP {Number(taxSummaryQuery.data?.summary.vatAmount || 0).toFixed(2)}</p>
+            </div>
+          </div>
+        )}
+      </article>
 
       <article className="rounded-xl border bg-card p-4 shadow-sm">
         <h2 className="text-lg font-semibold">Enabled Modules</h2>
@@ -326,6 +1446,380 @@ export default function SellerStoreConfigPage() {
           ))}
         </select>
       </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Category Thumbnail Style</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Choose how category thumbnail chips appear in POS tabs and side menu.
+        </p>
+
+        <label className="mb-2 block text-sm font-medium">Shape</label>
+        <select
+          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+          value={form.categoryThumbnailShape}
+          onChange={(event) =>
+            updateDraft({
+              categoryThumbnailShape: event.target.value as CategoryThumbnailShape,
+            })
+          }
+        >
+          <option value="rounded">Rounded square</option>
+          <option value="circle">Circle</option>
+        </select>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Printer Setup</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Configure printer adapter, receipt size, and bridge options for adaptive POS printing.
+        </p>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setAllPrinterSections(true)}>
+            Expand All
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setAllPrinterSections(false)}>
+            Collapse All
+          </Button>
+        </div>
+
+        <details
+          open={printerSectionsOpen.adapterProfile}
+          onToggle={(event) =>
+            togglePrinterSection(
+              "adapterProfile",
+              (event.currentTarget as HTMLDetailsElement).open,
+            )
+          }
+          className="rounded-md border border-slate-200 bg-white p-3"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Adapter & Receipt Profile</summary>
+          <div className="mt-3 space-y-3">
+            <label className="mb-2 block text-sm font-medium">Preferred Printer Adapter</label>
+            <div className="space-y-2">
+              {adapterDiagnostics.map((option) => {
+                const selected = form.printerAdapter === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={!option.runtimeAllowed}
+                    onClick={() => updateDraft({ printerAdapter: option.value })}
+                    className={`w-full rounded-md border p-2 text-left text-sm ${
+                      selected
+                        ? "border-brand-500 bg-brand-50"
+                        : option.runtimeAllowed
+                          ? "border-slate-200 bg-white"
+                          : "cursor-not-allowed border-slate-200 bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-slate-800">{option.label}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          option.available
+                            ? "bg-emerald-100 text-emerald-700"
+                            : option.runtimeAllowed
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {option.available
+                          ? "Available"
+                          : option.runtimeAllowed
+                            ? "Needs Setup"
+                            : "Unsupported"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600">{option.reason}</p>
+                    {option.runtimeAllowed && !option.available ? (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void runFixIt(option.value);
+                          }}
+                          className="rounded-md bg-slate-800 px-2 py-1 text-[11px] font-semibold text-white"
+                        >
+                          Fix It
+                        </button>
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-500">
+              Runtime profile: {runtimeProfile.runtimeMode}. Unsupported adapters are disabled with reason.
+            </p>
+
+            <label className="mb-2 block text-sm font-medium">Receipt Paper Size</label>
+            <select
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={form.receiptPaperSize}
+              onChange={(event) =>
+                updateDraft({
+                  receiptPaperSize: event.target.value as NonNullable<StorePrintingConfig["paperSize"]>,
+                })
+              }
+            >
+              <option value="58mm">58mm thermal</option>
+              <option value="80mm">80mm thermal</option>
+            </select>
+
+            <label className="mb-2 block text-sm font-medium">Desktop Printer Name (optional)</label>
+            <Input
+              ref={desktopPrinterInputRef}
+              value={form.desktopPrinterName}
+              onChange={(event) => updateDraft({ desktopPrinterName: event.target.value })}
+              placeholder="e.g. EPSON TM-T82"
+            />
+
+            <label className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+              <span>Auto print receipt after checkout</span>
+              <input
+                type="checkbox"
+                checked={form.autoPrintReceipts}
+                onChange={(event) => updateDraft({ autoPrintReceipts: event.target.checked })}
+              />
+            </label>
+          </div>
+        </details>
+
+        <details
+          open={printerSectionsOpen.bluetoothManager}
+          onToggle={(event) =>
+            togglePrinterSection(
+              "bluetoothManager",
+              (event.currentTarget as HTMLDetailsElement).open,
+            )
+          }
+          className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Bluetooth Printer Manager (Android)</summary>
+          <div className="mt-3 space-y-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+              <p>
+                Connection status: <strong>{connectionStatus}</strong>
+              </p>
+              <p className="mt-1">
+                Saved printer: <strong>{form.bluetoothPrinterName || "None"}</strong>
+              </p>
+              <p className="mt-1">
+                MAC: <strong>{form.bluetoothPrinterMac || "Not set"}</strong>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void scanBluetoothPrinters()} disabled={isScanning}>
+                {isScanning ? "Scanning..." : "Scan Devices"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void disconnectBluetoothPrinter()}
+                disabled={isConnecting || connectionStatus !== "CONNECTED"}
+              >
+                Disconnect
+              </Button>
+              <Button type="button" variant="outline" onClick={savePreferredBluetoothPrinter} disabled={!selectedPrinter}>
+                Save Printer
+              </Button>
+              <Button type="button" variant="outline" onClick={removePreferredBluetoothPrinter}>
+                Remove Saved Printer
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void testPrint()}>
+                Print Test Receipt
+              </Button>
+            </div>
+
+            <label className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+              <span>Auto reconnect saved Bluetooth printer</span>
+              <input
+                type="checkbox"
+                checked={form.bluetoothAutoReconnect}
+                onChange={(event) => updateDraft({ bluetoothAutoReconnect: event.target.checked })}
+              />
+            </label>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nearby Bluetooth Printers</p>
+              {discoveredPrinters.length ? (
+                <div className="space-y-2">
+                  {discoveredPrinters.map((printer) => {
+                    const active =
+                      selectedPrinter?.id === printer.id ||
+                      (selectedPrinter?.macAddress && selectedPrinter.macAddress === printer.macAddress);
+
+                    return (
+                      <div
+                        key={printer.id}
+                        className={`rounded-md border p-2 text-xs ${
+                          active ? "border-brand-400 bg-brand-50" : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-800">{printer.name}</p>
+                            <p className="text-slate-500">{printer.macAddress || printer.id}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void connectBluetoothPrinter(printer)}
+                            disabled={isConnecting}
+                          >
+                            {isConnecting && active ? "Connecting..." : "Connect"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-md border border-dashed border-slate-300 p-2 text-xs text-slate-500">
+                  No printers discovered yet. Tap Scan Devices.
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Default Printer Name</label>
+                <Input
+                  value={form.bluetoothPrinterName}
+                  onChange={(event) => updateDraft({ bluetoothPrinterName: event.target.value })}
+                  placeholder="BP-210 / XPrinter XP-58"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">Default Printer MAC</label>
+                <Input
+                  value={form.bluetoothPrinterMac}
+                  onChange={(event) => updateDraft({ bluetoothPrinterMac: event.target.value })}
+                  placeholder="AA:BB:CC:DD:EE:FF"
+                />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details
+          open={printerSectionsOpen.bridgeHealth}
+          onToggle={(event) =>
+            togglePrinterSection(
+              "bridgeHealth",
+              (event.currentTarget as HTMLDetailsElement).open,
+            )
+          }
+          className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Bridge Health</summary>
+          <div className="mt-3 text-xs text-slate-700">
+            <p>
+              Runtime mode: <strong>{runtimeProfile.runtimeMode}</strong>
+            </p>
+            <p>
+              Bridge health: <strong>{bridgeHealth.available ? "Available" : "Unavailable"}</strong>
+            </p>
+            <p>{bridgeHealth.message}</p>
+            {printerActionMessage ? <p className="mt-2 text-slate-600">{printerActionMessage}</p> : null}
+          </div>
+        </details>
+
+        <details
+          open={printerSectionsOpen.setupChecklist}
+          onToggle={(event) =>
+            togglePrinterSection(
+              "setupChecklist",
+              (event.currentTarget as HTMLDetailsElement).open,
+            )
+          }
+          className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Setup Checklist</summary>
+          <ol className="mt-3 list-decimal space-y-2 pl-4 text-xs text-slate-700">
+            {setupChecklist.map((step) => (
+              <li key={step.text} className="flex items-start justify-between gap-2">
+                <span>{step.text}</span>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${checklistStatusClass(step.status)}`}
+                >
+                  {checklistStatusLabel(step.status)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
+
+        <details
+          open={printerSectionsOpen.actions}
+          onToggle={(event) =>
+            togglePrinterSection(
+              "actions",
+              (event.currentTarget as HTMLDetailsElement).open,
+            )
+          }
+          className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+        >
+          <summary className="cursor-pointer text-sm font-semibold text-slate-800">Actions</summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => void connectPrinterBridge()}>
+              Connect Bridge
+            </Button>
+            <Button type="button" variant="outline" onClick={() => void testPrint()}>
+              Test Print
+            </Button>
+            <Button type="button" variant="outline" onClick={resetChecklistProgress}>
+              Reset Checklist Progress
+            </Button>
+          </div>
+        </details>
+      </article>
+
+      <article className="rounded-xl border bg-card p-4 shadow-sm">
+        <h2 className="text-lg font-semibold">Category Images</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Upload one optimized image per category for POS and inventory visuals.
+        </p>
+
+        <div className="space-y-4">
+          {form.categoryCatalog.map((entry) => (
+            <div key={entry.key} className="rounded-xl border p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold capitalize">{entry.key}</p>
+                <Input
+                  className="max-w-xs"
+                  value={entry.label}
+                  onChange={(event) =>
+                    updateCategoryCatalog(entry.key, { label: event.target.value })
+                  }
+                  placeholder="Category label"
+                />
+              </div>
+
+              <ImageUploadDropzone
+                value={entry.images}
+                onChange={(nextImages) =>
+                  updateCategoryCatalog(entry.key, {
+                    images: nextImages.slice(0, 1),
+                    image: nextImages[0]?.url || "",
+                  })
+                }
+                folder={`sukigo/categories/${entry.key}`}
+                maxFiles={1}
+                previewShape={form.categoryThumbnailShape}
+              />
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <PlanFeatureFlagsPanel />
+
+      <AccessControlOverridesPanel />
 
       <Button
         onClick={() => updateMutation.mutate()}

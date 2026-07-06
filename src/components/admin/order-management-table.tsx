@@ -65,7 +65,7 @@ function AdminOrderCard({
               {order.id}
             </p>
           </div>
-          <Badge variant="outline" className={ORDER_STATUS_TONE[order.status]}>
+          <Badge className={ORDER_STATUS_TONE[order.status]}>
             {order.status.replaceAll("_", " ")}
           </Badge>
         </div>
@@ -129,7 +129,7 @@ export function OrderManagementTable({
         </div>
 
         <Badge
-          variant="outline"
+          // variant="outline"
           className="w-fit border-slate-300 bg-white text-slate-700"
         >
           {orders.length} total

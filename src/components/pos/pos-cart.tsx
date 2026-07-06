@@ -42,7 +42,7 @@ export function POSCart({
       <div className="space-y-3">
         {items.length === 0 ? (
           <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-            No items yet. Add products from the grid.
+            No items yet. Add inventories from the grid.
           </p>
         ) : (
           items.map((item) => (

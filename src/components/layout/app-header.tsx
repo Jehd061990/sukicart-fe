@@ -27,7 +27,7 @@ export function AppHeader({ onOpenMenu }: AppHeaderProps) {
   );
 
   return (
-    <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-0 border-b bg-background/95 backdrop-blur-sm">
       <div className="flex min-h-16 items-center justify-between gap-2 px-3 py-2 md:px-6">
         <div className="flex items-center gap-3">
           <Button

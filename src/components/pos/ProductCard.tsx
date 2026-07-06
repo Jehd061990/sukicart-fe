@@ -1,31 +1,7 @@
 "use client";
 
+import { resolveProductThumbnailUrl } from "@/lib/images/product-image";
 import { Product } from "@/types/product";
-
-const DEFAULT_API_BASE_URL =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:5000/api"
-    : "https://sukicart-be.onrender.com/api";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL;
-const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
-
-function resolveProductImageUrl(image?: string) {
-  if (!image) {
-    return "";
-  }
-
-  if (
-    image.startsWith("http://") ||
-    image.startsWith("https://") ||
-    image.startsWith("data:")
-  ) {
-    return image;
-  }
-
-  const normalizedPath = image.startsWith("/") ? image : `/${image}`;
-  return `${API_ORIGIN}${normalizedPath}`;
-}
 
 interface ProductCardProps {
   product: Product;
@@ -40,7 +16,7 @@ export function ProductCard({
   onOpenDetails,
   highlight = false,
 }: ProductCardProps) {
-  const imageUrl = resolveProductImageUrl(product.image);
+  const imageUrl = resolveProductThumbnailUrl(product);
   const outOfStock = product.stock <= 0;
 
   return (

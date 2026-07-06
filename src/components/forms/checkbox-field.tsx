@@ -4,9 +4,10 @@ import {
   Path,
   UseFormRegister,
 } from "react-hook-form";
+import { ReactNode } from "react";
 
 interface CheckboxFieldProps<T extends FieldValues> {
-  label: string;
+  label: ReactNode;
   name: Path<T>;
   register: UseFormRegister<T>;
   error?: FieldError;

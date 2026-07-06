@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { InputField } from "@/components/forms/input-field";
 import { TextArea } from "@/components/forms/text-area";
@@ -24,7 +24,9 @@ export default function RegisterBuyerPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<BuyerRegistrationFormValues>({
-    resolver: zodResolver(buyerRegistrationSchema),
+    resolver: zodResolver(
+      buyerRegistrationSchema,
+    ) as Resolver<BuyerRegistrationFormValues>,
     mode: "onBlur",
     defaultValues: {
       fullName: "",

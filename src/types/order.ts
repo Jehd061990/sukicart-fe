@@ -67,6 +67,7 @@ export interface MarketplaceOrder {
 
 export interface PickupQrPayload {
   orderId: string;
+  transactionNumber?: string;
   status: MarketplaceOrderStatus;
   pickupVerificationCode: string;
   pickupQrValue: string;
@@ -77,19 +78,29 @@ export interface PickupQrPayload {
 export interface CreateOrderResponse {
   message: string;
   order: {
-    _id: string;
+    id: string;
+    transactionNumber: string;
     status: MarketplaceOrderStatus;
     total: number;
-    sellerId: string;
-    buyerId: string;
+    seller: MarketplaceOrderParty | null;
+    buyer: MarketplaceOrderParty | null;
     createdAt: string;
+    updatedAt: string;
+    type: "ONLINE" | "POS";
+    branchId: string | null;
+    items: MarketplaceOrderItem[];
   };
   orders?: Array<{
-    _id: string;
+    id: string;
+    transactionNumber: string;
     status: MarketplaceOrderStatus;
     total: number;
-    sellerId: string;
-    buyerId: string;
+    seller: MarketplaceOrderParty | null;
+    buyer: MarketplaceOrderParty | null;
     createdAt: string;
+    updatedAt: string;
+    type: "ONLINE" | "POS";
+    branchId: string | null;
+    items: MarketplaceOrderItem[];
   }>;
 }

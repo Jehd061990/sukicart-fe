@@ -1,6 +1,16 @@
 export type ProductCategory = "vegetables" | "meat" | "fish";
 export type ProductUnit = "kg" | "pcs";
 export type ProductStatus = "active" | "inactive";
+export type ProductTaxType = "VAT" | "VAT_EXEMPT" | "ZERO_RATED" | "NON_VAT";
+
+export interface ProductImageAsset {
+  url: string;
+  publicId: string;
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  format: string;
+}
 
 export interface Product {
   _id: string;
@@ -16,7 +26,10 @@ export interface Product {
     | string
     | { _id: string; name?: string; email?: string; role?: string };
   image?: string;
+  images?: ProductImageAsset[];
   description?: string;
+  taxType: ProductTaxType;
+  taxRate: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -51,6 +64,9 @@ export interface CreateProductPayload {
   category: ProductCategory;
   status?: ProductStatus;
   image?: string;
+  images?: ProductImageAsset[];
+  taxType?: ProductTaxType;
+  taxRate?: number;
 }
 
 export type UpdateProductPayload = Partial<CreateProductPayload>;

@@ -2,6 +2,7 @@
 
 import { POSCartItem } from "@/store/pos-cart.store";
 import { CartItem } from "@/components/pos/CartItem";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 
 interface CheckoutModalProps {
   open: boolean;
@@ -38,8 +39,8 @@ export function CheckoutModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
-      <div className="flex h-[86vh] w-full max-w-2xl flex-col rounded-t-3xl bg-white p-4 shadow-xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl sm:ring-1 sm:ring-slate-200">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="flex h-[86vh] w-full max-w-2xl min-h-0 flex-col overflow-hidden rounded-t-3xl bg-white p-4 shadow-xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl sm:ring-1 sm:ring-slate-200">
+        <div className="mb-4 flex shrink-0 items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900">Checkout</h3>
           <button
             type="button"
@@ -50,10 +51,10 @@ export function CheckoutModal({
           </button>
         </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+        <SimplebarScroll className="min-h-0 flex-1 pr-1" contentClassName="space-y-2 pb-2">
           {items.length === 0 ? (
             <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
-              No items yet. Add products first.
+              No items yet. Add inventories first.
             </p>
           ) : (
             items.map((item) => (
@@ -66,9 +67,9 @@ export function CheckoutModal({
               />
             ))
           )}
-        </div>
+        </SimplebarScroll>
 
-        <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
+        <div className="mt-4 shrink-0 space-y-2 border-t border-slate-200 pt-4">
           <div className="flex items-center justify-between text-sm text-slate-600">
             <span>Subtotal</span>
             <span>PHP {subtotal.toFixed(2)}</span>

@@ -8,6 +8,23 @@ import { usePWAStore } from "@/store/pwa.store";
 
 const createLocalOrderId = () => `local-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
+const registerBackgroundSync = async () => {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    if ("sync" in registration) {
+      await (registration as ServiceWorkerRegistration & {
+        sync: { register: (tag: string) => Promise<void> };
+      }).sync.register("sukicart-pos-sync");
+    }
+  } catch {
+    // Ignore when background sync is unavailable.
+  }
+};
+
 export const enqueuePOSOrder = async (
   payload: SyncQueueEntry["payload"],
   reason: "offline" | "network-failure" = "offline",
@@ -26,6 +43,8 @@ export const enqueuePOSOrder = async (
     status: "queued",
     createdAt: Date.now(),
   });
+
+  await registerBackgroundSync();
 };
 
 export const useSyncQueue = () => {

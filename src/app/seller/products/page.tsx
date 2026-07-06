@@ -1,5 +1,5 @@
-import { ProductManagement } from "@/components/seller/product-management";
+import { redirect } from "next/navigation";
 
 export default function SellerProductManagementPage() {
-  return <ProductManagement />;
+  redirect("/seller/inventory");
 }

@@ -10,6 +10,15 @@ export interface InventoryListItem {
     category: string;
     unit: "kg" | "pcs";
     price: number;
+    image?: string;
+    images?: Array<{
+      url: string;
+      publicId: string;
+      thumbnailUrl: string;
+      width: number;
+      height: number;
+      format: string;
+    }>;
   } | null;
   updatedAt: string;
 }

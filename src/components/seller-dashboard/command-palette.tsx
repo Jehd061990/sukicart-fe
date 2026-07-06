@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SellerDashboardModule, SellerFeatureFlags } from "@/types/saas-dashboard";
 import { Button } from "@/components/ui/button";
+import { SimplebarScroll } from "@/components/ui/simplebar-scroll";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -23,7 +24,7 @@ export function CommandPalette({ open, modules, features, onClose }: CommandPale
             Close
           </Button>
         </div>
-        <div className="max-h-[65vh] space-y-1 overflow-y-auto p-2">
+        <SimplebarScroll className="max-h-[65vh] p-2" contentClassName="space-y-1">
           {modules.map((module) => {
             const enabled = features[module.requiredFeature];
             return (
@@ -50,7 +51,7 @@ export function CommandPalette({ open, modules, features, onClose }: CommandPale
               </Link>
             );
           })}
-        </div>
+        </SimplebarScroll>
       </div>
     </div>
   );

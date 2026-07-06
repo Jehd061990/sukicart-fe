@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock } from "lucide-react";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { CalendarRange } from "lucide-react";
+import { DateRange, DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { sellerService } from "@/lib/api/services/seller.service";
 import { subscriptionService } from "@/lib/api/services/subscription.service";
 import {
   SELLER_FEATURES_BY_PLAN,
@@ -13,8 +24,7 @@ import {
   SELLER_QUICK_ACTIONS,
   SELLER_WIDGETS_BY_PLAN,
 } from "@/config/seller-dashboard";
-import { SellerFeatureKey, SellerPlanTier } from "@/types/saas-dashboard";
-import { Button } from "@/components/ui/button";
+import { SellerPlanTier } from "@/types/saas-dashboard";
 import { useSellerDashboardStore } from "@/store/seller-dashboard.store";
 import { CommandPalette } from "@/components/seller-dashboard/command-palette";
 import { DashboardSkeleton } from "@/components/seller-dashboard/dashboard-skeleton";
@@ -25,24 +35,85 @@ import { OnboardingTracker } from "@/components/seller-dashboard/onboarding-trac
 import { QuickActions } from "@/components/seller-dashboard/quick-actions";
 import { SalesOverviewChart } from "@/components/seller-dashboard/sales-overview-chart";
 import { SubscriptionStatusBanner } from "@/components/seller-dashboard/subscription-status-banner";
+import { SellerDashboardIncomePreset } from "@/types/seller-dashboard";
 
-const parsePermissionInput = (rawValue: string) =>
-  Array.from(
-    new Set(
-      rawValue
-        .split(/[\n,]+/g)
-        .map((entry) => entry.trim())
-        .filter(Boolean),
-    ),
-  );
+const PH_CURRENCY = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  maximumFractionDigits: 0,
+});
+
+const startOfDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+
+const endOfDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+const toDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getRangeLabel = (range: DateRange | undefined) => {
+  if (!range?.from) {
+    return "Select date range";
+  }
+
+  if (!range.to) {
+    return range.from.toLocaleDateString();
+  }
+
+  return `${range.from.toLocaleDateString()} - ${range.to.toLocaleDateString()}`;
+};
+
+const getPresetRange = (preset: SellerDashboardIncomePreset): DateRange => {
+  const now = new Date();
+
+  if (preset === "yesterday") {
+    const date = new Date(now);
+    date.setDate(now.getDate() - 1);
+    return { from: startOfDay(date), to: endOfDay(date) };
+  }
+
+  if (preset === "this_week") {
+    const start = new Date(now);
+    const dayOffset = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - dayOffset);
+    return { from: startOfDay(start), to: endOfDay(now) };
+  }
+
+  if (preset === "this_month") {
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0),
+      to: endOfDay(now),
+    };
+  }
+
+  return {
+    from: startOfDay(now),
+    to: endOfDay(now),
+  };
+};
+
+const toDeltaLabel = (value: number | null, suffix: string, fallback: string) => {
+  if (value === null || Number.isNaN(value)) {
+    return fallback;
+  }
+
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(1)}% ${suffix}`;
+};
 
 export default function SellerDashboardPage() {
-  const queryClient = useQueryClient();
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
-  const [enabledOverridesState, setEnabledOverridesState] = useState<SellerFeatureKey[] | null>(null);
-  const [disabledOverridesState, setDisabledOverridesState] = useState<SellerFeatureKey[] | null>(null);
-  const [grantedPermissionsInputState, setGrantedPermissionsInputState] = useState<string | null>(null);
-  const [revokedPermissionsInputState, setRevokedPermissionsInputState] = useState<string | null>(null);
+  const [incomePreset, setIncomePreset] = useState<SellerDashboardIncomePreset>("today");
+  const [incomeRange, setIncomeRange] = useState<DateRange | undefined>(() => getPresetRange("today"));
+  const [isIncomeRangePickerOpen, setIsIncomeRangePickerOpen] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [branchPage, setBranchPage] = useState(1);
+  const [terminalPage, setTerminalPage] = useState(1);
   const {
     commandPaletteOpen,
     hiddenWidgetIds,
@@ -58,26 +129,65 @@ export default function SellerDashboardPage() {
     queryFn: subscriptionService.getCurrentSubscription,
   });
 
-  const accessControlQuery = useQuery({
-    queryKey: ["seller-access-control"],
-    queryFn: subscriptionService.getAccessControl,
+  const dashboardSummaryQuery = useQuery({
+    queryKey: ["seller-dashboard-summary"],
+    queryFn: sellerService.getDashboardSummary,
   });
 
-  const updateAccessMutation = useMutation({
-    mutationFn: subscriptionService.updateAccessControl,
-    onSuccess: (data) => {
-      setEnabledOverridesState((data.overrides.features.enabled || []) as SellerFeatureKey[]);
-      setDisabledOverridesState((data.overrides.features.disabled || []) as SellerFeatureKey[]);
-      setGrantedPermissionsInputState((data.overrides.permissions.granted || []).join("\n"));
-      setRevokedPermissionsInputState((data.overrides.permissions.revoked || []).join("\n"));
-      toast.success("Access control overrides updated");
-      queryClient.invalidateQueries({ queryKey: ["seller-access-control"] });
-      queryClient.invalidateQueries({ queryKey: ["seller-subscription-current"] });
-    },
-    onError: () => {
-      toast.error("Failed to update access control overrides");
-    },
+  const fromDate = useMemo(() => (incomeRange?.from ? toDateInput(incomeRange.from) : ""), [incomeRange?.from]);
+  const toDate = useMemo(() => (incomeRange?.to ? toDateInput(incomeRange.to) : ""), [incomeRange?.to]);
+  const incomeRangeLabel = useMemo(() => getRangeLabel(incomeRange), [incomeRange]);
+
+  const dashboardIncomeQuery = useQuery({
+    queryKey: [
+      "seller-dashboard-income",
+      incomePreset,
+      fromDate,
+      toDate,
+      branchPage,
+      selectedBranchId,
+      terminalPage,
+    ],
+    queryFn: () =>
+      sellerService.getDashboardIncome({
+        preset: incomePreset,
+        ...(incomePreset === "custom" ? { from: fromDate, to: toDate } : {}),
+        branchPage,
+        branchLimit: 8,
+        ...(selectedBranchId ? { branchId: selectedBranchId, terminalPage, terminalLimit: 8 } : {}),
+      }),
+    enabled: incomePreset !== "custom" || Boolean(fromDate && toDate),
   });
+
+  const applyIncomePreset = (nextPreset: SellerDashboardIncomePreset) => {
+    setIncomePreset(nextPreset);
+    setBranchPage(1);
+    setTerminalPage(1);
+    if (nextPreset !== "custom") {
+      setIncomeRange(getPresetRange(nextPreset));
+      setIsIncomeRangePickerOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    setBranchPage(1);
+    setTerminalPage(1);
+  }, [fromDate, toDate, incomePreset]);
+
+  useEffect(() => {
+    if (!selectedBranchId) {
+      return;
+    }
+
+    const branchExists =
+      dashboardIncomeQuery.data?.branches.rows.some((branch) => branch.branchId === selectedBranchId) ||
+      dashboardIncomeQuery.data?.selectedBranch?.branchId === selectedBranchId;
+
+    if (!branchExists) {
+      setSelectedBranchId(null);
+      setTerminalPage(1);
+    }
+  }, [dashboardIncomeQuery.data?.branches.rows, dashboardIncomeQuery.data?.selectedBranch?.branchId, selectedBranchId]);
 
   const plan = (subscriptionQuery.data?.subscription?.plan || "FREE") as SellerPlanTier;
   const features = useMemo(() => {
@@ -129,55 +239,116 @@ export default function SellerDashboardPage() {
       .filter((widget): widget is NonNullable<typeof widget> => Boolean(widget));
   }, [personalizedWidgetOrder, widgets]);
 
-  const serverActivePermissions = subscriptionQuery.data?.subscription?.activePermissions || [];
-  const serverOverrides = accessControlQuery.data?.overrides;
-  const enabledOverrides = enabledOverridesState ?? ((serverOverrides?.features.enabled || []) as SellerFeatureKey[]);
-  const disabledOverrides = disabledOverridesState ?? ((serverOverrides?.features.disabled || []) as SellerFeatureKey[]);
-  const grantedPermissionsInput = grantedPermissionsInputState ?? (serverOverrides?.permissions.granted || []).join("\n");
-  const revokedPermissionsInput = revokedPermissionsInputState ?? (serverOverrides?.permissions.revoked || []).join("\n");
-  const allowedFeatureKeys = (accessControlQuery.data?.allowedFeatureKeys ||
-    Object.keys(features)) as SellerFeatureKey[];
-  const basePlanFeatures = SELLER_FEATURES_BY_PLAN[plan] || SELLER_FEATURES_BY_PLAN.FREE;
-  const activePermissionCount = Object.values(features).filter(Boolean).length;
+  const summaryWidgetMetrics = useMemo(() => {
+    const summary = dashboardSummaryQuery.data?.summary;
+    if (!summary) {
+      return null;
+    }
 
-  const toggleFeatureOverride = (
-    featureKey: SellerFeatureKey,
-    mode: "enabled" | "disabled",
-  ) => {
-    if (mode === "enabled") {
-      const exists = enabledOverrides.includes(featureKey);
-      const next = exists
-        ? enabledOverrides.filter((entry) => entry !== featureKey)
-        : [...enabledOverrides, featureKey];
-      setEnabledOverridesState(next);
-      if (!exists) {
-        setDisabledOverridesState((prev) => (prev || disabledOverrides).filter((entry) => entry !== featureKey));
+    return {
+      "today-sales": {
+        metric: PH_CURRENCY.format(summary.todaySales),
+        delta: toDeltaLabel(summary.todaySalesChangePct, "vs yesterday", "No sales yesterday"),
+        tone: summary.todaySalesChangePct !== null && summary.todaySalesChangePct < 0 ? "warning" : "success",
+      },
+      "total-orders": {
+        metric: String(summary.totalOrders),
+        delta: `${summary.recentTransactions} in the last 24 hours`,
+        tone: "neutral",
+      },
+      "product-count": {
+        metric: String(summary.productCount),
+        delta: `${summary.recentlyUpdatedProducts} recently updated`,
+        tone: "neutral",
+      },
+      "low-stock": {
+        metric: String(summary.lowStockCount),
+        delta: `${summary.criticalLowStockCount} critical items`,
+        tone: summary.lowStockCount > 0 ? "warning" : "success",
+      },
+      "recent-transactions": {
+        metric: String(summary.recentTransactions),
+        delta: "Last 24 hours",
+        tone: "neutral",
+      },
+      "revenue-analytics": {
+        metric: PH_CURRENCY.format(summary.monthlyRevenue),
+        delta: toDeltaLabel(summary.monthlyRevenueChangePct, "month-over-month", "No previous month baseline"),
+        tone: "success",
+      },
+      "monthly-sales": {
+        metric: PH_CURRENCY.format(summary.monthlyRevenue),
+        delta: "Rolling 30-day sales",
+        tone: "success",
+      },
+      "executive-revenue": {
+        metric: PH_CURRENCY.format(summary.monthlyRevenue),
+        delta: "Rolling 30-day revenue",
+        tone: "success",
+      },
+    } as Record<string, { metric: string; delta: string; tone: "success" | "warning" | "neutral" }>;
+  }, [dashboardSummaryQuery.data?.summary]);
+
+  const widgetMetrics = summaryWidgetMetrics;
+  const resolvedWidgets = useMemo(
+    () =>
+      sortedWidgets.map((widget) => {
+        const live = widgetMetrics?.[widget.id];
+        if (!live) {
+          return widget;
+        }
+
+        return {
+          ...widget,
+          metric: live.metric,
+          delta: live.delta,
+          tone: live.tone,
+        };
+      }),
+    [sortedWidgets, widgetMetrics],
+  );
+
+  const summaryChartData = dashboardSummaryQuery.data
+    ? {
+        FREE: dashboardSummaryQuery.data.charts.daily,
+        PRO: dashboardSummaryQuery.data.charts.weekly,
+        BUSINESS: dashboardSummaryQuery.data.charts.channels,
       }
-      return;
-    }
+    : null;
 
-    const exists = disabledOverrides.includes(featureKey);
-    const next = exists
-      ? disabledOverrides.filter((entry) => entry !== featureKey)
-      : [...disabledOverrides, featureKey];
-    setDisabledOverridesState(next);
-    if (!exists) {
-      setEnabledOverridesState((prev) => (prev || enabledOverrides).filter((entry) => entry !== featureKey));
-    }
-  };
+  const liveChartData = summaryChartData?.[plan];
 
-  const saveAccessOverrides = () => {
-    updateAccessMutation.mutate({
-      featureOverrides: {
-        enabled: enabledOverrides,
-        disabled: disabledOverrides,
-      },
-      permissionOverrides: {
-        granted: parsePermissionInput(grantedPermissionsInput),
-        revoked: parsePermissionInput(revokedPermissionsInput),
-      },
-    });
-  };
+  const branchChartData = useMemo(
+    () =>
+      (dashboardIncomeQuery.data?.branches.rows || []).map((branch) => ({
+        label:
+          branch.branchName.length > 14
+            ? `${branch.branchName.slice(0, 14)}...`
+            : branch.branchName,
+        netSales: branch.netSales,
+        grossSales: branch.grossSales,
+      })),
+    [dashboardIncomeQuery.data?.branches.rows],
+  );
+
+  const branchTotalPages = Math.max(
+    1,
+    Math.ceil(
+      Number(dashboardIncomeQuery.data?.branches.pagination.total || 0) /
+        Number(dashboardIncomeQuery.data?.branches.pagination.limit || 8),
+    ),
+  );
+
+  const terminalTotalPages = Math.max(
+    1,
+    Math.ceil(
+      Number(dashboardIncomeQuery.data?.selectedBranch?.pagination.total || 0) /
+        Number(dashboardIncomeQuery.data?.selectedBranch?.pagination.limit || 8),
+    ),
+  );
+
+  const serverActivePermissions = subscriptionQuery.data?.subscription?.activePermissions || [];
+  const activePermissionCount = Object.values(features).filter(Boolean).length;
 
   if (subscriptionQuery.isLoading) {
     return <DashboardSkeleton />;
@@ -211,8 +382,301 @@ export default function SellerDashboardPage() {
               <QuickActions actions={SELLER_QUICK_ACTIONS} />
             </section>
 
+            <section className="rounded-2xl border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Business Performance</p>
+                  <h2 className="mt-1 text-xl font-semibold text-foreground">Income Analytics Dashboard</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Company summary, branch income overview, and POS terminal drilldown.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyIncomePreset("today")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                      incomePreset === "today"
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyIncomePreset("yesterday")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                      incomePreset === "yesterday"
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    Yesterday
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyIncomePreset("this_week")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                      incomePreset === "this_week"
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    This Week
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyIncomePreset("this_month")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                      incomePreset === "this_month"
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    This Month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIncomePreset("custom")}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                      incomePreset === "custom"
+                        ? "bg-brand-600 text-white"
+                        : "border border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    Custom Range
+                  </button>
+                </div>
+              </div>
+
+              {incomePreset === "custom" ? (
+                <div className="relative mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsIncomeRangePickerOpen((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+                  >
+                    <CalendarRange className="h-4 w-4" />
+                    {incomeRangeLabel}
+                  </button>
+
+                  {isIncomeRangePickerOpen ? (
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg md:absolute md:z-10">
+                      <DayPicker
+                        mode="range"
+                        selected={incomeRange}
+                        onSelect={(nextRange) => {
+                          setIncomeRange(nextRange);
+                          setIncomePreset("custom");
+                        }}
+                        numberOfMonths={2}
+                        defaultMonth={incomeRange?.from}
+                        className="text-sm"
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsIncomeRangePickerOpen(false)}
+                          className="rounded-md bg-slate-800 px-3 py-1 text-xs font-semibold text-white"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {dashboardIncomeQuery.isLoading ? (
+                <p className="mt-4 text-sm text-muted-foreground">Loading branch and terminal analytics...</p>
+              ) : (
+                <>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Net Sales</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">
+                        {PH_CURRENCY.format(dashboardIncomeQuery.data?.overall.netSales || 0)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Gross Sales</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">
+                        {PH_CURRENCY.format(dashboardIncomeQuery.data?.overall.grossSales || 0)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Discounts</p>
+                      <p className="mt-1 text-xl font-semibold text-amber-700">
+                        {PH_CURRENCY.format(dashboardIncomeQuery.data?.overall.discounts || 0)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Refunds</p>
+                      <p className="mt-1 text-xl font-semibold text-rose-700">
+                        {PH_CURRENCY.format(dashboardIncomeQuery.data?.overall.refunds || 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 xl:col-span-2">
+                      <p className="text-sm font-semibold text-slate-900">Branch Income Overview</p>
+                      <p className="mb-3 text-xs text-slate-500">Net vs gross sales per branch</p>
+                      <div className="h-72 w-full">
+                        <ResponsiveContainer>
+                          <BarChart data={branchChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="label" />
+                            <YAxis />
+                            <Tooltip
+                              formatter={(value: number) => PH_CURRENCY.format(Number(value || 0))}
+                            />
+                            <Bar dataKey="netSales" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                            <Bar dataKey="grossSales" fill="#94a3b8" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-sm font-semibold text-slate-900">Branches</p>
+                      <div className="mt-2 space-y-2">
+                        {(dashboardIncomeQuery.data?.branches.rows || []).map((branch) => (
+                          <button
+                            type="button"
+                            key={branch.branchId || branch.branchName}
+                            onClick={() => {
+                              setSelectedBranchId(branch.branchId);
+                              setTerminalPage(1);
+                            }}
+                            className={`w-full rounded-lg border px-3 py-2 text-left ${
+                              selectedBranchId && branch.branchId === selectedBranchId
+                                ? "border-brand-300 bg-brand-50"
+                                : "border-slate-200 bg-white"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold text-slate-900">{branch.branchName}</p>
+                            <p className="text-xs text-slate-600">Net: {PH_CURRENCY.format(branch.netSales)}</p>
+                            <p
+                              className={`text-xs ${
+                                branch.trendPct === null
+                                  ? "text-slate-500"
+                                  : branch.trendPct >= 0
+                                    ? "text-emerald-700"
+                                    : "text-rose-700"
+                              }`}
+                            >
+                              {branch.trendPct === null
+                                ? "No prior period baseline"
+                                : `${branch.trendPct > 0 ? "+" : ""}${branch.trendPct.toFixed(1)}% vs previous period`}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between border-t pt-3">
+                        <p className="text-xs text-slate-500">Page {branchPage} of {branchTotalPages}</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={branchPage <= 1}
+                            onClick={() => setBranchPage((page) => Math.max(1, page - 1))}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs disabled:opacity-50"
+                          >
+                            Prev
+                          </button>
+                          <button
+                            type="button"
+                            disabled={branchPage >= branchTotalPages}
+                            onClick={() => setBranchPage((page) => Math.min(branchTotalPages, page + 1))}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {dashboardIncomeQuery.data?.selectedBranch ? (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            POS-Level Income Breakdown - {dashboardIncomeQuery.data.selectedBranch.branchName}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Sales and transaction performance by POS terminal
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedBranchId(null);
+                            setTerminalPage(1);
+                          }}
+                          className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+                        >
+                          Close Drilldown
+                        </button>
+                      </div>
+
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="w-full min-w-160 text-left text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                              <th className="px-2 py-2">POS Terminal</th>
+                              <th className="px-2 py-2">Gross Sales</th>
+                              <th className="px-2 py-2">Discounts</th>
+                              <th className="px-2 py-2">Refunds</th>
+                              <th className="px-2 py-2">Net Sales</th>
+                              <th className="px-2 py-2">Transactions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dashboardIncomeQuery.data.selectedBranch.terminals.map((terminal) => (
+                              <tr key={terminal.terminalId || terminal.terminalLabel} className="border-b border-slate-100">
+                                <td className="px-2 py-2 font-medium text-slate-800">{terminal.terminalLabel}</td>
+                                <td className="px-2 py-2">{PH_CURRENCY.format(terminal.grossSales)}</td>
+                                <td className="px-2 py-2 text-amber-700">{PH_CURRENCY.format(terminal.discounts)}</td>
+                                <td className="px-2 py-2 text-rose-700">{PH_CURRENCY.format(terminal.refunds)}</td>
+                                <td className="px-2 py-2 font-semibold text-slate-900">{PH_CURRENCY.format(terminal.netSales)}</td>
+                                <td className="px-2 py-2">{terminal.transactions}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between border-t pt-3">
+                        <p className="text-xs text-slate-500">Page {terminalPage} of {terminalTotalPages}</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={terminalPage <= 1}
+                            onClick={() => setTerminalPage((page) => Math.max(1, page - 1))}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs disabled:opacity-50"
+                          >
+                            Prev
+                          </button>
+                          <button
+                            type="button"
+                            disabled={terminalPage >= terminalTotalPages}
+                            onClick={() => setTerminalPage((page) => Math.min(terminalTotalPages, page + 1))}
+                            className="rounded-md border border-slate-200 px-2 py-1 text-xs disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </section>
+
             <KPIWidgetGrid
-              widgets={sortedWidgets}
+              widgets={resolvedWidgets}
               hiddenWidgetIds={hiddenWidgetIds}
               onToggleHidden={toggleWidgetVisibility}
               onDragStart={setDraggedWidgetId}
@@ -228,7 +692,7 @@ export default function SellerDashboardPage() {
 
             <section className="grid gap-4 xl:grid-cols-3">
               <div className="xl:col-span-2">
-                <SalesOverviewChart plan={plan} />
+                <SalesOverviewChart plan={plan} data={liveChartData} />
               </div>
               <NotificationsFeed items={notifications} />
             </section>
@@ -260,118 +724,6 @@ export default function SellerDashboardPage() {
               <OnboardingTracker steps={onboardingSteps} features={features} />
             </section>
 
-            <section className="rounded-2xl border bg-card p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Plan Feature Flags</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {Object.entries(features).map(([key, enabled]) => (
-                  <div
-                    key={key}
-                    className={`rounded-xl border px-3 py-2 text-xs ${
-                      enabled
-                        ? "border-brand-200 bg-brand-50 text-brand-800"
-                        : "border-amber-200 bg-amber-50 text-amber-800"
-                    }`}
-                  >
-                    <p className="font-semibold">{key}</p>
-                    <p className="mt-1">{enabled ? "Enabled" : "Locked"}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <Lock className="h-3.5 w-3.5" />
-                Role-based rendering and subscription plan checks are applied before module access.
-              </p>
-              {serverActivePermissions.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {serverActivePermissions.slice(0, 12).map((permission) => (
-                    <span
-                      key={permission}
-                      className="rounded-full border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
-                    >
-                      {permission}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-
-            <section className="rounded-2xl border bg-card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Access Control Overrides</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Override plan defaults per seller by forcing feature access and granting/revoking granular permissions.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  onClick={saveAccessOverrides}
-                  disabled={updateAccessMutation.isPending}
-                >
-                  {updateAccessMutation.isPending ? "Saving..." : "Save Overrides"}
-                </Button>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {allowedFeatureKeys.map((featureKey) => {
-                  const baseEnabled = Boolean(basePlanFeatures[featureKey]);
-                  const effectiveEnabled = Boolean(features[featureKey]);
-                  const forcedEnabled = enabledOverrides.includes(featureKey);
-                  const forcedDisabled = disabledOverrides.includes(featureKey);
-
-                  return (
-                    <div key={featureKey} className="rounded-xl border p-3">
-                      <p className="text-sm font-semibold text-foreground">{featureKey}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Plan default: {baseEnabled ? "Enabled" : "Locked"} | Effective: {effectiveEnabled ? "Enabled" : "Locked"}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                        <label className="inline-flex items-center gap-1 rounded-full border px-2 py-1">
-                          <input
-                            type="checkbox"
-                            checked={forcedEnabled}
-                            onChange={() => toggleFeatureOverride(featureKey, "enabled")}
-                          />
-                          Force enable
-                        </label>
-                        <label className="inline-flex items-center gap-1 rounded-full border px-2 py-1">
-                          <input
-                            type="checkbox"
-                            checked={forcedDisabled}
-                            onChange={() => toggleFeatureOverride(featureKey, "disabled")}
-                          />
-                          Force disable
-                        </label>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                <div className="rounded-xl border p-3">
-                  <p className="text-sm font-semibold text-foreground">Granted Permissions Override</p>
-                  <p className="mt-1 text-xs text-muted-foreground">One permission per line (or comma-separated).</p>
-                  <textarea
-                    value={grantedPermissionsInput}
-                    onChange={(event) => setGrantedPermissionsInputState(event.target.value)}
-                    className="mt-2 h-28 w-full rounded-lg border bg-background px-2 py-2 text-xs"
-                    placeholder="reports:export\nautomation:manage"
-                  />
-                </div>
-
-                <div className="rounded-xl border p-3">
-                  <p className="text-sm font-semibold text-foreground">Revoked Permissions Override</p>
-                  <p className="mt-1 text-xs text-muted-foreground">One permission per line (or comma-separated).</p>
-                  <textarea
-                    value={revokedPermissionsInput}
-                    onChange={(event) => setRevokedPermissionsInputState(event.target.value)}
-                    className="mt-2 h-28 w-full rounded-lg border bg-background px-2 py-2 text-xs"
-                    placeholder="billing:manage"
-                  />
-                </div>
-              </div>
-            </section>
       </main>
     </div>
   );

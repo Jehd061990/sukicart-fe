@@ -12,7 +12,6 @@ import {
   Package,
   Repeat2,
   ShieldCheck,
-  ShoppingCart,
   Sparkles,
   Store,
   TrendingUp,
@@ -130,19 +129,11 @@ export const SELLER_MODULE_CATALOG: SellerDashboardModule[] = [
   },
   {
     key: "products",
-    label: "Products",
-    href: "/seller/products",
-    icon: Package,
-    description: "Catalog, pricing, and product lifecycle.",
+    label: "Inventory",
+    href: "/seller/inventory",
+    icon: Warehouse,
+    description: "Catalog, stock levels, pricing, and product lifecycle.",
     requiredFeature: "products",
-  },
-  {
-    key: "orders",
-    label: "Orders",
-    href: "/seller/orders",
-    icon: ShoppingCart,
-    description: "Order queues and fulfillment performance.",
-    requiredFeature: "orders",
   },
   {
     key: "customers",
@@ -159,15 +150,6 @@ export const SELLER_MODULE_CATALOG: SellerDashboardModule[] = [
     icon: ShieldCheck,
     description: "Cashier accounts, roles, and activity logs.",
     requiredFeature: "employees",
-    upgradeMessage: "Upgrade to PRO",
-  },
-  {
-    key: "inventory",
-    label: "Inventory",
-    href: "/seller/inventory",
-    icon: Warehouse,
-    description: "Variants, categories, and low-stock automation.",
-    requiredFeature: "inventory",
     upgradeMessage: "Upgrade to PRO",
   },
   {
@@ -200,7 +182,7 @@ export const SELLER_MODULE_CATALOG: SellerDashboardModule[] = [
   {
     key: "billing",
     label: "Billing",
-    href: "/seller/pos",
+    href: "/seller/billing",
     icon: DollarSign,
     description: "Subscription lifecycle, invoices, and upgrades.",
     requiredFeature: "billing",
@@ -520,9 +502,9 @@ export const SELLER_ONBOARDING_STEPS: Record<SellerPlanTier, OnboardingStep[]> =
 export const SELLER_QUICK_ACTIONS = [
   {
     id: "qa-1",
-    label: "Create Product",
+    label: "Create Inventory",
     icon: Boxes,
-    href: "/seller/products",
+    href: "/seller/inventory",
   },
   {
     id: "qa-2",
@@ -534,7 +516,7 @@ export const SELLER_QUICK_ACTIONS = [
     id: "qa-3",
     label: "Review Billing",
     icon: DollarSign,
-    href: "/seller/pos",
+    href: "/seller/billing",
   },
   {
     id: "qa-4",

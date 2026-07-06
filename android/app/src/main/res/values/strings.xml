@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SukiGo</string>
+    <string name="title_activity_main">SukiGo</string>
+    <string name="package_name">com.sukigo.pos</string>
+    <string name="custom_url_scheme">com.sukigo.pos</string>
+</resources>

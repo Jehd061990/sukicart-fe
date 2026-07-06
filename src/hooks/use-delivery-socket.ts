@@ -18,6 +18,7 @@ const DEFAULT_API_BASE_URL =
 
 interface UseDeliverySocketOptions {
   orderId?: string;
+  branchId?: string;
   onLocationUpdated?: (payload: LocationUpdatedEvent) => void;
   onRiderLocationUpdate?: (payload: LocationUpdatedEvent) => void;
   onTrackingUpdated?: (payload: TrackingUpdatedEvent) => void;
@@ -27,6 +28,7 @@ interface UseDeliverySocketOptions {
 
 export const useDeliverySocket = ({
   orderId,
+  branchId,
   onLocationUpdated,
   onRiderLocationUpdate,
   onTrackingUpdated,
@@ -64,8 +66,18 @@ export const useDeliverySocket = ({
       socket.emit("order:subscribe", { orderId });
     };
 
+    const subscribeToBranchRoom = () => {
+      if (!branchId) {
+        return;
+      }
+
+      socket.emit("pos.orders.subscribe", { branchId });
+    };
+
     socket.on("connect", subscribeToOrderRoom);
+    socket.on("connect", subscribeToBranchRoom);
     subscribeToOrderRoom();
+    subscribeToBranchRoom();
 
     socket.on("order:trackingUpdated", (payload: TrackingUpdatedEvent) => {
       if (payload.orderId === orderId && onTrackingUpdated) {
@@ -105,6 +117,30 @@ export const useDeliverySocket = ({
       }
     });
 
+    socket.on("pos.order.created", (payload: OrderChangedEvent) => {
+      if (onOrderChanged) {
+        onOrderChanged(payload);
+      }
+    });
+
+    socket.on("pos.order.claimed", (payload: OrderChangedEvent) => {
+      if (onOrderChanged) {
+        onOrderChanged(payload);
+      }
+    });
+
+    socket.on("pos.order.status.changed", (payload: OrderChangedEvent) => {
+      if (onOrderChanged) {
+        onOrderChanged(payload);
+      }
+    });
+
+    socket.on("pos.order.transferred", (payload: OrderChangedEvent) => {
+      if (onOrderChanged) {
+        onOrderChanged(payload);
+      }
+    });
+
     socket.on("order_status_update", (payload: OrderStatusUpdateEvent) => {
       if (onOrderChanged) {
         onOrderChanged({
@@ -117,11 +153,13 @@ export const useDeliverySocket = ({
 
     return () => {
       socket.off("connect", subscribeToOrderRoom);
+      socket.off("connect", subscribeToBranchRoom);
       socket.disconnect();
       socketRef.current = null;
     };
   }, [
     orderId,
+    branchId,
     token,
     onLocationUpdated,
     onRiderLocationUpdate,

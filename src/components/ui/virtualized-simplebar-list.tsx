@@ -7,12 +7,14 @@ import "simplebar-react/dist/simplebar.min.css";
 
 type VirtualizedSimpleBarListProps<T> = {
   items: T[];
-  height: number;
+  height: number | string;
   estimateSize: number;
   gap?: number;
   overscan?: number;
   className?: string;
   contentClassName?: string;
+  itemClassName?: string;
+  hideHorizontalOverflow?: boolean;
   getItemKey?: (item: T, index: number) => string | number;
   renderItem: (item: T, index: number) => ReactNode;
 };
@@ -25,6 +27,8 @@ export function VirtualizedSimpleBarList<T>({
   overscan = 6,
   className,
   contentClassName = "relative p-3",
+  itemClassName = "absolute left-0 top-0 w-full px-3",
+  hideHorizontalOverflow = false,
   getItemKey,
   renderItem,
 }: VirtualizedSimpleBarListProps<T>) {
@@ -47,7 +51,10 @@ export function VirtualizedSimpleBarList<T>({
       autoHide
       style={{ height }}
       className={className}
-      scrollableNodeProps={{ ref: setScrollElement }}
+      scrollableNodeProps={{
+        ref: setScrollElement,
+        style: hideHorizontalOverflow ? { overflowX: "hidden" } : undefined,
+      }}
     >
       <div
         className={contentClassName}
@@ -66,7 +73,7 @@ export function VirtualizedSimpleBarList<T>({
                   ? getItemKey(item, virtualItem.index)
                   : virtualItem.index
               }
-              className="absolute left-0 top-0 w-full px-3"
+              className={itemClassName}
               style={{ transform: `translateY(${virtualItem.start}px)` }}
             >
               {renderItem(item, virtualItem.index)}

@@ -1,5 +1,5 @@
-import { SellerTrackingPanel } from "@/components/delivery/seller-tracking-panel";
+import { redirect } from "next/navigation";
 
 export default function SellerOrderManagementPage() {
-  return <SellerTrackingPanel />;
+  redirect("/seller/pos");
 }

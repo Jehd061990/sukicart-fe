@@ -103,3 +103,17 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+self.addEventListener("sync", (event) => {
+  if (event.tag !== "sukicart-pos-sync") {
+    return;
+  }
+
+  event.waitUntil(
+    self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({ type: "SUKICART_SYNC_QUEUE" });
+      });
+    }),
+  );
+});

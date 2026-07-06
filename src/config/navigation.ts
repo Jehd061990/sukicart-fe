@@ -1,7 +1,9 @@
 import {
   Building2,
+  Bluetooth,
   ChartColumnIncreasing,
   ShieldCheck,
+  DollarSign,
   LucideIcon,
   ClipboardCheck,
   FileClock,
@@ -53,31 +55,30 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     routeBase: "/seller",
     modules: [
       { label: "Dashboard", href: "/seller/dashboard", icon: LayoutGrid },
-      { label: "Multi-Branch", href: "/seller/branches", icon: Building2 },
       { label: "POS", href: "/seller/pos", icon: HandCoins },
-      {
-        label: "Products",
-        href: "/seller/products",
-        icon: Package,
-      },
-      { label: "Order Management", href: "/seller/orders", icon: ShoppingCart },
-      { label: "Customers", href: "/seller/customers", icon: Users },
-      { label: "Employees", href: "/seller/employees", icon: ShieldCheck },
       {
         label: "Inventory",
         href: "/seller/inventory",
         icon: Warehouse,
       },
-      { label: "Transfers", href: "/seller/transfers", icon: Repeat2 },
-      { label: "Analytics", href: "/seller/analytics", icon: ChartColumnIncreasing },
-      { label: "Reports", href: "/seller/reports", icon: ClipboardCheck },
-      { label: "Automation", href: "/seller/automation", icon: Sparkles },
-      { label: "Audit Logs", href: "/seller/audit-logs", icon: FileClock },
+      { label: "Multi-Branch", href: "/seller/branches", icon: Building2 },
+      // { label: "Customers", href: "/seller/customers", icon: Users },
+      // { label: "Employees", href: "/seller/employees", icon: ShieldCheck },
+      // { label: "Transfers", href: "/seller/transfers", icon: Repeat2 },
+      // {
+      //   label: "Analytics",
+      //   href: "/seller/analytics",
+      //   icon: ChartColumnIncreasing,
+      // },
+      // { label: "Reports", href: "/seller/reports", icon: ClipboardCheck },
+      // { label: "Automation", href: "/seller/automation", icon: Sparkles },
+      // { label: "Audit Logs", href: "/seller/audit-logs", icon: FileClock },
       {
         label: "Settings",
         href: "/seller/store-config",
         icon: ShieldCheck,
       },
+      { label: "Billing", href: "/seller/billing", icon: DollarSign },
     ],
   },
   {
@@ -135,7 +136,17 @@ export const ROLE_MODULES: RoleModuleConfig[] = [
     title: "POS Modules",
     role: "POS",
     routeBase: "/pos",
-    modules: [{ label: "Order Dashboard", href: "/pos", icon: HandCoins }],
+    modules: [
+      {
+        label: "Sales Dashboard",
+        href: "/pos?panel=dashboard",
+        icon: ChartColumnIncreasing,
+      },
+      { label: "Store Operations", href: "/pos", icon: HandCoins },
+      // { label: "Online Orders", href: "/pos?panel=orders", icon: ShoppingCart },  {/* This will be a future feature if there are many users of POS */}
+      { label: "Receipt History", href: "/pos?panel=receipts", icon: Receipt },
+      { label: "Printer Module", href: "/pos/printer", icon: Bluetooth },
+    ],
   },
 ];
 

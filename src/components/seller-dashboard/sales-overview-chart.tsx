@@ -18,10 +18,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface SalesOverviewChartProps {
   plan: SellerPlanTier;
+  data?: Array<Record<string, number | string>>;
 }
 
-export function SalesOverviewChart({ plan }: SalesOverviewChartProps) {
-  const data = SELLER_SALES_SERIES[plan];
+export function SalesOverviewChart({ plan, data: liveData }: SalesOverviewChartProps) {
+  const data = liveData && liveData.length > 0 ? liveData : SELLER_SALES_SERIES[plan];
+  const proSecondaryKey = data.some((entry) => typeof entry.profit === "number")
+    ? "profit"
+    : data.some((entry) => typeof entry.orders === "number")
+      ? "orders"
+      : null;
+  const businessSecondaryKey = data.some((entry) => typeof entry.transfers === "number")
+    ? "transfers"
+    : data.some((entry) => typeof entry.orders === "number")
+      ? "orders"
+      : null;
 
   return (
     <Card>
@@ -38,7 +49,9 @@ export function SalesOverviewChart({ plan }: SalesOverviewChartProps) {
               <Tooltip />
               <Legend />
               <Bar dataKey="revenue" fill="var(--color-chart-1)" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="transfers" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
+              {businessSecondaryKey ? (
+                <Bar dataKey={businessSecondaryKey} fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
+              ) : null}
             </BarChart>
           ) : (
             <LineChart data={data as any}>
@@ -57,7 +70,7 @@ export function SalesOverviewChart({ plan }: SalesOverviewChartProps) {
               {plan === "PRO" ? (
                 <Line
                   type="monotone"
-                  dataKey="profit"
+                  dataKey={proSecondaryKey || "profit"}
                   stroke="var(--color-chart-3)"
                   strokeWidth={2.5}
                   dot={{ r: 3 }}
