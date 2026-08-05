@@ -11,7 +11,7 @@ export default function RiderRolePage() {
   return (
     <RoleModuleSection
       title={riderConfig.title}
-      subtitle="Rider workflow modules"
+      subtitle="Rider workflow module/modules"
       modules={riderConfig.modules}
     />
   );
